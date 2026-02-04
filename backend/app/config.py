@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
 
+    # Basic Auth (optional - set to enable password protection)
+    basic_auth_username: str = ""
+    basic_auth_password: str = ""
+
     # Embedding config
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536

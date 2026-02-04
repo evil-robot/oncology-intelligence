@@ -10,10 +10,14 @@ Provides REST API for:
 """
 
 import logging
+import secrets
+import base64
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
 from app.database import init_db
@@ -27,6 +31,55 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    """HTTP Basic Authentication middleware."""
+
+    def __init__(self, app, username: str, password: str):
+        super().__init__(app)
+        self.username = username
+        self.password = password
+
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth for health check endpoints
+        if request.url.path in ["/", "/api/health"]:
+            return await call_next(request)
+
+        # Check for Authorization header
+        auth_header = request.headers.get("Authorization")
+
+        if auth_header is None or not auth_header.startswith("Basic "):
+            return Response(
+                content="Authentication required",
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="SuperTruth Violet"'},
+            )
+
+        # Decode and verify credentials
+        try:
+            encoded_credentials = auth_header.split(" ")[1]
+            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
+            username, password = decoded_credentials.split(":", 1)
+
+            # Use secrets.compare_digest to prevent timing attacks
+            if not (
+                secrets.compare_digest(username, self.username)
+                and secrets.compare_digest(password, self.password)
+            ):
+                return Response(
+                    content="Invalid credentials",
+                    status_code=401,
+                    headers={"WWW-Authenticate": 'Basic realm="SuperTruth Violet"'},
+                )
+        except Exception:
+            return Response(
+                content="Invalid authorization header",
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="SuperTruth Violet"'},
+            )
+
+        return await call_next(request)
 
 
 @asynccontextmanager
@@ -56,6 +109,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Basic Auth middleware (only if credentials are configured)
+if settings.basic_auth_username and settings.basic_auth_password:
+    logger.info("Basic Auth protection enabled")
+    app.add_middleware(
+        BasicAuthMiddleware,
+        username=settings.basic_auth_username,
+        password=settings.basic_auth_password,
+    )
+else:
+    logger.info("Basic Auth not configured - running without password protection")
 
 # Include routers
 app.include_router(clusters.router, prefix="/api/clusters", tags=["clusters"])
