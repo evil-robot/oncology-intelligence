@@ -161,7 +161,7 @@ export default function ExplainerPanel() {
               {/* Quick Overview */}
               <div className="bg-white/5 rounded-xl p-4">
                 <p className="text-sm text-gray-300 leading-relaxed">
-                  This <span className="text-primary font-medium">SuperTruth</span> data dashboard visualizes what people search for related to cancer and rare diseases, from pediatric oncology to adult cancers to genetic conditions. Search terms are mapped in 3D space based on meaning, overlaid with <span className="text-secondary font-medium">social vulnerability data</span>, and analyzed by AI to surface <span className="text-yellow-400 font-medium">actionable insights</span>.
+                  This <span className="text-green-400 font-medium">SuperTruth</span> data dashboard visualizes what people search for related to cancer and rare diseases, from pediatric oncology to adult cancers to genetic conditions. Search terms are mapped in 3D space based on meaning, overlaid with <span className="text-secondary font-medium">social vulnerability data</span>, and analyzed by AI to surface <span className="text-yellow-400 font-medium">actionable insights</span>.
                 </p>
               </div>
 
