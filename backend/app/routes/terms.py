@@ -113,7 +113,7 @@ async def get_similar_terms(
 ):
     """Find semantically similar terms using vector similarity."""
     term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
-    if not term or not term.embedding:
+    if not term or term.embedding is None:
         return {"error": "Term not found or has no embedding"}, 404
 
     # Use pgvector similarity search
