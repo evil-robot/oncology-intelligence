@@ -25,6 +25,12 @@ interface DataSource {
   data_type: string
   update_frequency: string
   coverage: string
+  stored?: boolean
+}
+
+interface SourcesResponse {
+  core_data: DataSource[]
+  evidence_sources: DataSource[]
 }
 
 interface TriangulationData {
@@ -70,7 +76,8 @@ const strengthColors: Record<string, string> = {
 
 export default function DataSourcesPanel() {
   const selection = useSelection()
-  const [sources, setSources] = useState<DataSource[]>([])
+  const [coreData, setCoreData] = useState<DataSource[]>([])
+  const [evidenceSources, setEvidenceSources] = useState<DataSource[]>([])
   const [triangulation, setTriangulation] = useState<TriangulationData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'sources' | 'evidence'>('sources')
@@ -84,8 +91,9 @@ export default function DataSourcesPanel() {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         const response = await fetch(`${API_URL}/api/triangulate/sources`)
         if (response.ok) {
-          const data = await response.json()
-          setSources(data.sources)
+          const data: SourcesResponse = await response.json()
+          setCoreData(data.core_data || [])
+          setEvidenceSources(data.evidence_sources || [])
         }
       } catch (error) {
         console.error('Failed to fetch sources:', error)
@@ -155,36 +163,84 @@ export default function DataSourcesPanel() {
 
       {/* Sources Tab */}
       {activeTab === 'sources' && (
-        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-          {sources.map((source) => {
-            const Icon = sourceIcons[source.id] || Database
-            return (
-              <div
-                key={source.id}
-                className="bg-surface/50 rounded-lg p-3 space-y-1"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4 text-cyan-400" />
-                    <span className="text-sm font-medium text-white">{source.name}</span>
+        <div className="space-y-4 max-h-[400px] overflow-y-auto">
+          {/* Core Data Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Database className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-semibold text-green-400 uppercase tracking-wide">Core Data</span>
+              <span className="text-[10px] text-gray-500 bg-green-400/10 px-2 py-0.5 rounded">Stored in Database</span>
+            </div>
+            {coreData.map((source) => {
+              const Icon = sourceIcons[source.id] || Database
+              return (
+                <div
+                  key={source.id}
+                  className="bg-green-400/5 border border-green-400/20 rounded-lg p-3 space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-4 h-4 text-green-400" />
+                      <span className="text-sm font-medium text-white">{source.name}</span>
+                    </div>
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-500 hover:text-green-400 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-gray-500 hover:text-cyan-400 transition-colors"
+                  <p className="text-xs text-gray-400">{source.description}</p>
+                  <div className="flex gap-3 text-[10px] text-gray-500">
+                    <span>Updates: {source.update_frequency}</span>
+                    <span>Coverage: {source.coverage}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Evidence Sources Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <FlaskConical className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wide">Evidence Sources</span>
+              <span className="text-[10px] text-gray-500 bg-cyan-400/10 px-2 py-0.5 rounded">Queried On-Demand</span>
+            </div>
+            <div className="space-y-2">
+              {evidenceSources.map((source) => {
+                const Icon = sourceIcons[source.id] || Database
+                return (
+                  <div
+                    key={source.id}
+                    className="bg-surface/50 rounded-lg p-3 space-y-1"
                   >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                <p className="text-xs text-gray-400">{source.description}</p>
-                <div className="flex gap-3 text-[10px] text-gray-500">
-                  <span>Updates: {source.update_frequency}</span>
-                  <span>Coverage: {source.coverage}</span>
-                </div>
-              </div>
-            )
-          })}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-4 h-4 text-cyan-400" />
+                        <span className="text-sm font-medium text-white">{source.name}</span>
+                      </div>
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-500 hover:text-cyan-400 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <p className="text-xs text-gray-400">{source.description}</p>
+                    <div className="flex gap-3 text-[10px] text-gray-500">
+                      <span>Updates: {source.update_frequency}</span>
+                      <span>Coverage: {source.coverage}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 
