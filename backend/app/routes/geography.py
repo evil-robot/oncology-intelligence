@@ -104,6 +104,16 @@ async def get_region(
     )
 
 
+def generate_demo_regional_interest(geo_code: str, term_id: Optional[int] = None) -> float:
+    """Generate consistent demo interest for a region."""
+    import hashlib
+    # Create a hash from geo_code and term_id for consistent random-ish values
+    seed_str = f"{geo_code}-{term_id or 0}"
+    hash_val = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+    # Generate interest between 20-80
+    return 20 + (hash_val % 60)
+
+
 @router.get("/heatmap")
 async def get_heatmap_data(
     db: Session = Depends(get_db),
@@ -120,6 +130,10 @@ async def get_heatmap_data(
     regions = db.query(GeographicRegion).filter(
         GeographicRegion.level == "state"
     ).all()
+
+    # Check if we have any trend data at all
+    trend_count = db.query(TrendData).count()
+    demo_mode = trend_count == 0
 
     # Build term filter
     term_filter = []
@@ -142,14 +156,18 @@ async def get_heatmap_data(
 
     result = []
     for region in regions:
-        # Calculate interest for this region
-        interest_query = db.query(func.avg(TrendData.interest)).filter(
-            TrendData.geo_code == region.geo_code
-        )
-        if term_filter:
-            interest_query = interest_query.filter(TrendData.term_id.in_(term_filter))
+        if demo_mode:
+            # Generate demo interest data
+            interest = generate_demo_regional_interest(region.geo_code, term_id or cluster_id)
+        else:
+            # Calculate interest for this region from real data
+            interest_query = db.query(func.avg(TrendData.interest)).filter(
+                TrendData.geo_code == region.geo_code
+            )
+            if term_filter:
+                interest_query = interest_query.filter(TrendData.term_id.in_(term_filter))
 
-        interest = interest_query.scalar()
+            interest = interest_query.scalar() or 0
 
         result.append({
             "geo_code": region.geo_code,
@@ -164,6 +182,7 @@ async def get_heatmap_data(
                 round(interest * (1 + (region.svi_overall or 0)), 1)
                 if interest else 0
             ),
+            "demo_mode": demo_mode,
         })
 
     return result
