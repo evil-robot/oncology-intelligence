@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, EyeOff, Link2, Tag, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
+import { Eye, EyeOff, Link2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useStore, useView } from '@/lib/store'
 import Tooltip from './Tooltip'
 
@@ -21,21 +21,6 @@ export default function ViewControls() {
           <p className="text-gray-400 text-xs">
             {view.showLabels ? 'Click to hide' : 'Click to show'} term labels when hovering
             over data points in the 3D visualization.
-          </p>
-        </div>
-      ),
-    },
-    {
-      icon: Tag,
-      label: 'Posts',
-      active: view.showPosts,
-      onClick: () => setView('showPosts', !view.showPosts),
-      tooltip: (
-        <div>
-          <p className="font-medium text-white mb-1">Toggle Posts</p>
-          <p className="text-gray-400 text-xs">
-            {view.showPosts ? 'Click to hide' : 'Click to show'} social media posts
-            and related content markers (green squares) in the visualization.
           </p>
         </div>
       ),
