@@ -438,54 +438,77 @@ function FlyControls({ enabled }: { enabled: boolean }) {
   return null
 }
 
-// Auto-pilot drift mode
+// Auto-pilot drift mode - orbits around data center keeping everything in view
 function AutoPilot({ enabled, terms }: { enabled: boolean; terms: Term[] }) {
   const { camera } = useThree()
   const timeRef = useRef(0)
-  const pathPoints = useRef<THREE.Vector3[]>([])
+  const centerRef = useRef(new THREE.Vector3(0, 0, 0))
+  const radiusRef = useRef(12)
 
+  // Calculate data center and appropriate orbit radius
   useEffect(() => {
     if (terms.length > 0) {
-      // Create a smooth path through random points
-      const points: THREE.Vector3[] = []
-      const shuffled = [...terms].sort(() => Math.random() - 0.5).slice(0, 10)
-      shuffled.forEach(t => {
-        points.push(new THREE.Vector3(t.x + (Math.random() - 0.5) * 2, t.y + (Math.random() - 0.5) * 2, t.z + 3))
+      // Find the center of all data points
+      let sumX = 0, sumY = 0, sumZ = 0
+      let minX = Infinity, maxX = -Infinity
+      let minY = Infinity, maxY = -Infinity
+      let minZ = Infinity, maxZ = -Infinity
+
+      terms.forEach(t => {
+        sumX += t.x
+        sumY += t.y
+        sumZ += t.z
+        minX = Math.min(minX, t.x)
+        maxX = Math.max(maxX, t.x)
+        minY = Math.min(minY, t.y)
+        maxY = Math.max(maxY, t.y)
+        minZ = Math.min(minZ, t.z)
+        maxZ = Math.max(maxZ, t.z)
       })
-      pathPoints.current = points
+
+      centerRef.current = new THREE.Vector3(
+        sumX / terms.length,
+        sumY / terms.length,
+        sumZ / terms.length
+      )
+
+      // Calculate radius to keep all data visible with padding
+      const rangeX = maxX - minX
+      const rangeY = maxY - minY
+      const rangeZ = maxZ - minZ
+      radiusRef.current = Math.max(rangeX, rangeY, rangeZ) * 0.7 + 8
     }
   }, [terms])
 
   useFrame((_, delta) => {
-    if (!enabled || pathPoints.current.length === 0) return
+    if (!enabled || terms.length === 0) return
 
-    timeRef.current += delta * 0.03
+    timeRef.current += delta * 0.12 // Gentle tour speed
 
-    const points = pathPoints.current
-    const t = (timeRef.current % points.length)
-    const i = Math.floor(t)
-    const f = t - i
+    const center = centerRef.current
+    const radius = radiusRef.current
+    const t = timeRef.current
 
-    const p0 = points[(i - 1 + points.length) % points.length]
-    const p1 = points[i % points.length]
-    const p2 = points[(i + 1) % points.length]
-    const p3 = points[(i + 2) % points.length]
+    // Create a smooth orbital path - figure-8 with tilt for variety
+    const angle1 = t * 0.25
+    const angle2 = t * 0.15
+    const verticalOffset = Math.sin(angle2) * radius * 0.3
 
-    // Catmull-Rom interpolation
-    const target = new THREE.Vector3()
-    target.x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * f + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * f * f + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * f * f * f)
-    target.y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * f + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * f * f + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * f * f * f)
-    target.z = 0.5 * (2 * p1.z + (-p0.z + p2.z) * f + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * f * f + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * f * f * f)
+    const targetPos = new THREE.Vector3(
+      center.x + Math.sin(angle1) * radius,
+      center.y + verticalOffset + 2, // Keep slightly above center
+      center.z + Math.cos(angle1) * radius
+    )
 
-    camera.position.lerp(target, 0.02)
+    // Smoothly move camera
+    camera.position.lerp(targetPos, 0.015)
 
-    // Look towards next point
-    const lookAt = points[(i + 1) % points.length]
+    // Always look at the data center
     const targetQuat = new THREE.Quaternion()
     const lookMatrix = new THREE.Matrix4()
-    lookMatrix.lookAt(camera.position, lookAt, new THREE.Vector3(0, 1, 0))
+    lookMatrix.lookAt(camera.position, center, new THREE.Vector3(0, 1, 0))
     targetQuat.setFromRotationMatrix(lookMatrix)
-    camera.quaternion.slerp(targetQuat, 0.01)
+    camera.quaternion.slerp(targetQuat, 0.025)
   })
 
   return null
