@@ -743,7 +743,7 @@ export default function ClusterVisualization() {
           transform: 'translateX(-50%)',
           display: 'flex',
           gap: 10,
-          zIndex: 100,
+          zIndex: 50,
         }}
       >
         <button
@@ -797,7 +797,7 @@ export default function ClusterVisualization() {
             color: '#fff',
             fontSize: 12,
             fontFamily: 'ui-monospace, monospace',
-            zIndex: 100,
+            zIndex: 50,
             textAlign: 'center',
           }}
         >
@@ -822,7 +822,7 @@ export default function ClusterVisualization() {
             color: '#fff',
             fontSize: 12,
             fontFamily: 'ui-monospace, monospace',
-            zIndex: 100,
+            zIndex: 50,
             textAlign: 'center',
           }}
         >
