@@ -102,6 +102,22 @@ export interface ChatResponse {
   suggested_questions?: string[]
 }
 
+export interface Insight {
+  type: 'spike' | 'drop' | 'emerging' | 'regional_outlier' | 'correlation'
+  severity: 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  term_id?: number
+  term_name?: string
+  cluster_id?: number
+  geo_code?: string
+  metric_value?: number
+  baseline_value?: number
+  percent_change?: number
+  detected_at?: string
+  demo_mode?: boolean
+}
+
 export interface DataSource {
   id: number
   geo_code: string
@@ -216,6 +232,18 @@ export const api = {
     }),
   getChatSuggestions: () =>
     fetchApi<{ suggestions: string[] }>('/api/chat/suggestions'),
+
+  // Insights
+  getInsights: (params?: { type?: string; severity?: string; limit?: number }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.type) searchParams.set('type', params.type)
+    if (params?.severity) searchParams.set('severity', params.severity)
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    const query = searchParams.toString()
+    return fetchApi<{ insights: Insight[]; demo_mode: boolean; trend_data_points: number }>(
+      `/api/insights/${query ? `?${query}` : ''}`
+    )
+  },
 
   // Region Comparison
   getDataSources: () => fetchApi<DataSource[]>('/api/compare/sources'),

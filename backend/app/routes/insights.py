@@ -83,10 +83,11 @@ def get_sample_insights(db: Session) -> list[dict]:
 
 
 @router.get("/")
+@router.get("")  # Support both with and without trailing slash
 async def get_insights(
     db: Session = Depends(get_db),
     severity: Optional[str] = Query(None, description="Filter by severity: high, medium, low"),
-    type: Optional[str] = Query(None, description="Filter by type: spike, drop, emerging, regional_outlier, correlation"),
+    insight_type: Optional[str] = Query(None, alias="type", description="Filter by type: spike, drop, emerging, regional_outlier, correlation"),
     limit: int = Query(20, le=100),
 ):
     """
@@ -121,8 +122,8 @@ async def get_insights(
         insights = [i for i in insights if i["severity"] == severity]
 
     # Filter by type
-    if type:
-        insights = [i for i in insights if i["type"] == type]
+    if insight_type:
+        insights = [i for i in insights if i["type"] == insight_type]
 
     return {"insights": insights[:limit], "demo_mode": demo_mode, "trend_data_points": trend_count}
 

@@ -93,7 +93,7 @@ export default function InsightsPanel() {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const params = filter ? `?type=${filter}` : ''
-      const response = await fetch(`${API_URL}/api/insights${params}`)
+      const response = await fetch(`${API_URL}/api/insights/${params}`)
       if (!response.ok) throw new Error('Failed to fetch insights')
       const data = await response.json()
       // Handle new response format: {insights: [...], demo_mode: bool, trend_data_points: int}
