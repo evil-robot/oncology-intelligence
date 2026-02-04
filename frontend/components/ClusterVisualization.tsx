@@ -262,7 +262,7 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
   )
 }
 
-// Elegant connection lines with gradient
+// Connection lines between terms and their clusters
 function DataConnections({ terms, clusters }: { terms: Term[]; clusters: Cluster[] }) {
   const lines = useMemo(() => {
     const result: Array<{ points: [number, number, number][]; color: string }> = []
@@ -285,6 +285,9 @@ function DataConnections({ terms, clusters }: { terms: Term[]; clusters: Cluster
     return result
   }, [terms, clusters])
 
+  // Don't render if no connections
+  if (lines.length === 0) return null
+
   return (
     <group>
       {lines.map((line, i) => (
@@ -292,9 +295,9 @@ function DataConnections({ terms, clusters }: { terms: Term[]; clusters: Cluster
           key={i}
           points={line.points}
           color={line.color}
-          lineWidth={0.5}
+          lineWidth={2}
           transparent
-          opacity={0.2}
+          opacity={0.5}
         />
       ))}
     </group>
