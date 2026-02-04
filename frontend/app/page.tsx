@@ -132,27 +132,13 @@ export default function HomePage() {
       </main>
 
       {/* Footer with Legal Disclaimer */}
-      <footer className="flex-shrink-0 border-t border-border px-6 py-3 bg-surface/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <SuperTruthLogo className="h-5 w-auto opacity-60" />
-              <span className="text-xs text-gray-500">|</span>
-              <span className="text-xs text-gray-500 font-medium">VIOLET</span>
-            </div>
-            <p className="text-xs text-gray-500 tracking-wide">
-              © 2026 SuperTruth Inc. ALL RIGHTS RESERVED
-            </p>
-          </div>
-          <div className="border-t border-border/50 pt-2">
-            <p className="text-[10px] text-gray-600 leading-relaxed">
-              <span className="text-yellow-500 font-bold">⚠️ CONFIDENTIAL & PROPRIETARY</span> — This platform contains trade secrets and proprietary data of SuperTruth Inc.
-              Unauthorized access, use, reproduction, or distribution is strictly prohibited and may result in civil and criminal penalties.
-              All data is provided for research purposes only and does not constitute medical advice.
-              By accessing this system, you acknowledge that your activity may be monitored and logged.
-            </p>
-          </div>
-        </div>
+      <footer className="flex-shrink-0 border-t border-border px-6 py-2 bg-surface/50">
+        <p className="text-[10px] text-gray-600 leading-relaxed">
+          <span className="text-yellow-500 font-bold">⚠️ CONFIDENTIAL & PROPRIETARY</span> — This platform contains trade secrets and proprietary data of SuperTruth Inc.
+          Unauthorized access, use, reproduction, or distribution is strictly prohibited and may result in civil and criminal penalties.
+          All data is provided for research purposes only and does not constitute medical advice.
+          By accessing this system, you acknowledge that your activity may be monitored and logged.
+        </p>
       </footer>
 
       {/* AI Chat Panel */}
