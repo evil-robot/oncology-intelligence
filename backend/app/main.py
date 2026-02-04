@@ -110,16 +110,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Basic Auth middleware (only if credentials are configured)
-if settings.basic_auth_username and settings.basic_auth_password:
-    logger.info("Basic Auth protection enabled")
-    app.add_middleware(
-        BasicAuthMiddleware,
-        username=settings.basic_auth_username,
-        password=settings.basic_auth_password,
-    )
-else:
-    logger.info("Basic Auth not configured - running without password protection")
+# Note: Basic Auth removed from backend - frontend handles authentication
+# The frontend login page protects access to the entire application
+logger.info("Backend API running without direct auth (frontend handles authentication)")
 
 # Include routers
 app.include_router(clusters.router, prefix="/api/clusters", tags=["clusters"])

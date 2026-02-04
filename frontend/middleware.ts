@@ -1,47 +1,31 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Basic Auth middleware for password protection
 export function middleware(request: NextRequest) {
-  const basicAuthUser = process.env.BASIC_AUTH_USERNAME
-  const basicAuthPassword = process.env.BASIC_AUTH_PASSWORD
+  const authPassword = process.env.BASIC_AUTH_PASSWORD
 
   // Skip auth if not configured
-  if (!basicAuthUser || !basicAuthPassword) {
+  if (!authPassword) {
     return NextResponse.next()
   }
 
-  // Check for Authorization header
-  const authHeader = request.headers.get('authorization')
-
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    return new NextResponse('Authentication required', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="SuperTruth Violet"',
-      },
-    })
+  // Allow access to login page and auth API
+  if (
+    request.nextUrl.pathname === '/login' ||
+    request.nextUrl.pathname.startsWith('/api/auth')
+  ) {
+    return NextResponse.next()
   }
 
-  // Decode and verify credentials
-  try {
-    const base64Credentials = authHeader.split(' ')[1]
-    const credentials = atob(base64Credentials)
-    const [username, password] = credentials.split(':')
+  // Check for auth cookie
+  const authCookie = request.cookies.get('violet_auth')
 
-    if (username === basicAuthUser && password === basicAuthPassword) {
-      return NextResponse.next()
-    }
-  } catch {
-    // Invalid auth header format
+  if (authCookie?.value === 'authenticated') {
+    return NextResponse.next()
   }
 
-  return new NextResponse('Invalid credentials', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': 'Basic realm="SuperTruth Violet"',
-    },
-  })
+  // Redirect to login page
+  return NextResponse.redirect(new URL('/login', request.url))
 }
 
 // Apply to all routes except static files
