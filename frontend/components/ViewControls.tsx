@@ -48,13 +48,14 @@ export default function ViewControls() {
         <Tooltip key={control.label} content={control.tooltip} position="bottom">
           <button
             onClick={control.onClick}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
               control.active
                 ? 'bg-primary/20 text-primary'
                 : 'text-gray-400 hover:text-white hover:bg-surface'
             }`}
           >
             <control.icon className="w-4 h-4" />
+            <span className="text-xs">{control.active ? 'ON' : 'OFF'}</span>
           </button>
         </Tooltip>
       ))}
