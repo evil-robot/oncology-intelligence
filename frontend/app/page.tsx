@@ -14,6 +14,7 @@ import ExplainerPanel from '@/components/ExplainerPanel'
 import ChatPanel from '@/components/ChatPanel'
 import DataSourcesPanel from '@/components/DataSourcesPanel'
 import PipelinePanel from '@/components/PipelinePanel'
+import VulnerabilityInsightsPanel from '@/components/VulnerabilityInsightsPanel'
 
 // Dynamic import for Three.js component (no SSR)
 const ClusterVisualization = dynamic(
@@ -87,6 +88,7 @@ export default function HomePage() {
         <aside className="w-72 flex-shrink-0 border-r border-border p-4 overflow-y-auto space-y-4">
           <FilterPanel />
           <InsightsPanel />
+          <VulnerabilityInsightsPanel />
         </aside>
 
         {/* Center - 3D Visualization */}
