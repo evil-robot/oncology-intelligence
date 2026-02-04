@@ -10,12 +10,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Database
-    database_url: str
+    database_url: str = ""
 
-    # OpenAI
-    openai_api_key: str
+    # OpenAI (optional - needed for embeddings)
+    openai_api_key: str = ""
 
-    # Azure Storage
+    # Azure Storage (optional)
     azure_storage_connection_string: str = ""
     azure_storage_container: str = "pediatric-oncology-data"
 
