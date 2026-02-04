@@ -289,12 +289,12 @@ export default function PipelinePanel() {
         {isRunning ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-base">Fetching Real Data...</span>
+            <span className="text-base">Fetching Google Trends Data...</span>
           </>
         ) : (
           <>
             <Play className="w-5 h-5" />
-            <span className="text-base">{hasTrendData ? 'Refresh Trends Data' : '▶ Fetch Real Google Trends'}</span>
+            <span className="text-base">{hasTrendData ? 'Refresh Google Trends' : '▶ Fetch Google Trends Data'}</span>
           </>
         )}
       </button>
