@@ -1,0 +1,120 @@
+{
+  "clusters": [
+    {
+      "id": 1,
+      "name": "Leukemia / ALL / AML",
+      "x": -2.5,
+      "y": 1.2,
+      "z": 0.8,
+      "color": "#6366f1",
+      "size": 1.4,
+      "termCount": 12
+    },
+    {
+      "id": 2,
+      "name": "Brain Tumors / DIPG",
+      "x": 1.8,
+      "y": 2.1,
+      "z": -1.2,
+      "color": "#ec4899",
+      "size": 1.2,
+      "termCount": 10
+    },
+    {
+      "id": 3,
+      "name": "Neuroblastoma / Solid Tumors",
+      "x": 2.2,
+      "y": -1.5,
+      "z": 1.5,
+      "color": "#14b8a6",
+      "size": 1.1,
+      "termCount": 9
+    },
+    {
+      "id": 4,
+      "name": "Treatment / Chemotherapy",
+      "x": -1.0,
+      "y": -2.2,
+      "z": -0.5,
+      "color": "#f59e0b",
+      "size": 1.3,
+      "termCount": 11
+    },
+    {
+      "id": 5,
+      "name": "Support / Resources",
+      "x": -3.0,
+      "y": -0.5,
+      "z": 2.0,
+      "color": "#8b5cf6",
+      "size": 1.0,
+      "termCount": 8
+    },
+    {
+      "id": 6,
+      "name": "Survivorship / Late Effects",
+      "x": 0.5,
+      "y": 0.3,
+      "z": -2.5,
+      "color": "#22c55e",
+      "size": 0.9,
+      "termCount": 7
+    }
+  ],
+  "terms": [
+    {"id": 1, "term": "childhood leukemia", "category": "diagnosis", "subcategory": "leukemia", "x": -2.3, "y": 1.0, "z": 0.6, "clusterId": 1},
+    {"id": 2, "term": "acute lymphoblastic leukemia children", "category": "diagnosis", "subcategory": "leukemia", "x": -2.7, "y": 1.4, "z": 0.9, "clusterId": 1},
+    {"id": 3, "term": "ALL in children", "category": "diagnosis", "subcategory": "leukemia", "x": -2.4, "y": 1.1, "z": 1.0, "clusterId": 1},
+    {"id": 4, "term": "acute myeloid leukemia pediatric", "category": "diagnosis", "subcategory": "leukemia", "x": -2.6, "y": 1.3, "z": 0.5, "clusterId": 1},
+    {"id": 5, "term": "AML children", "category": "diagnosis", "subcategory": "leukemia", "x": -2.5, "y": 1.5, "z": 0.7, "clusterId": 1},
+    {"id": 6, "term": "pediatric brain tumor", "category": "diagnosis", "subcategory": "brain_tumor", "x": 1.6, "y": 2.0, "z": -1.0, "clusterId": 2},
+    {"id": 7, "term": "childhood brain cancer", "category": "diagnosis", "subcategory": "brain_tumor", "x": 1.9, "y": 2.2, "z": -1.3, "clusterId": 2},
+    {"id": 8, "term": "medulloblastoma", "category": "diagnosis", "subcategory": "brain_tumor", "x": 2.0, "y": 2.3, "z": -1.1, "clusterId": 2},
+    {"id": 9, "term": "DIPG", "category": "diagnosis", "subcategory": "brain_tumor", "x": 1.7, "y": 1.9, "z": -1.4, "clusterId": 2},
+    {"id": 10, "term": "diffuse intrinsic pontine glioma", "category": "diagnosis", "subcategory": "brain_tumor", "x": 1.8, "y": 2.4, "z": -1.2, "clusterId": 2},
+    {"id": 11, "term": "neuroblastoma", "category": "diagnosis", "subcategory": "solid_tumor", "x": 2.0, "y": -1.3, "z": 1.4, "clusterId": 3},
+    {"id": 12, "term": "wilms tumor", "category": "diagnosis", "subcategory": "solid_tumor", "x": 2.3, "y": -1.6, "z": 1.6, "clusterId": 3},
+    {"id": 13, "term": "rhabdomyosarcoma", "category": "diagnosis", "subcategory": "solid_tumor", "x": 2.4, "y": -1.4, "z": 1.3, "clusterId": 3},
+    {"id": 14, "term": "osteosarcoma children", "category": "diagnosis", "subcategory": "solid_tumor", "x": 2.1, "y": -1.7, "z": 1.7, "clusterId": 3},
+    {"id": 15, "term": "pediatric chemotherapy", "category": "treatment", "subcategory": "chemotherapy", "x": -0.8, "y": -2.0, "z": -0.4, "clusterId": 4},
+    {"id": 16, "term": "chemo for kids", "category": "treatment", "subcategory": "chemotherapy", "x": -1.1, "y": -2.3, "z": -0.6, "clusterId": 4},
+    {"id": 17, "term": "pediatric radiation therapy", "category": "treatment", "subcategory": "radiation", "x": -1.2, "y": -2.1, "z": -0.3, "clusterId": 4},
+    {"id": 18, "term": "proton therapy children", "category": "treatment", "subcategory": "radiation", "x": -0.9, "y": -2.4, "z": -0.7, "clusterId": 4},
+    {"id": 19, "term": "bone marrow transplant children", "category": "treatment", "subcategory": "transplant", "x": -1.0, "y": -2.0, "z": -0.5, "clusterId": 4},
+    {"id": 20, "term": "CAR-T therapy pediatric", "category": "treatment", "subcategory": "immunotherapy", "x": -0.7, "y": -2.5, "z": -0.4, "clusterId": 4},
+    {"id": 21, "term": "childhood cancer support groups", "category": "support", "subcategory": "community", "x": -2.8, "y": -0.4, "z": 1.9, "clusterId": 5},
+    {"id": 22, "term": "pediatric oncology hospital", "category": "support", "subcategory": "facility", "x": -3.1, "y": -0.6, "z": 2.1, "clusterId": 5},
+    {"id": 23, "term": "children's cancer center near me", "category": "support", "subcategory": "facility", "x": -3.2, "y": -0.3, "z": 1.8, "clusterId": 5},
+    {"id": 24, "term": "childhood cancer financial assistance", "category": "support", "subcategory": "financial", "x": -2.9, "y": -0.7, "z": 2.2, "clusterId": 5},
+    {"id": 25, "term": "childhood cancer survivor", "category": "survivorship", "subcategory": "general", "x": 0.4, "y": 0.2, "z": -2.4, "clusterId": 6},
+    {"id": 26, "term": "late effects childhood cancer", "category": "survivorship", "subcategory": "late_effects", "x": 0.6, "y": 0.4, "z": -2.6, "clusterId": 6},
+    {"id": 27, "term": "long term effects pediatric cancer treatment", "category": "survivorship", "subcategory": "late_effects", "x": 0.3, "y": 0.1, "z": -2.3, "clusterId": 6},
+    {"id": 28, "term": "childhood cancer survivor clinic", "category": "survivorship", "subcategory": "follow_up", "x": 0.7, "y": 0.5, "z": -2.7, "clusterId": 6}
+  ],
+  "posts": [
+    {"id": 1, "title": "Understanding Childhood Leukemia: A Parent's Guide", "url": "#", "source": "curated", "x": -2.2, "y": 1.6, "z": 0.4, "clusterId": 1},
+    {"id": 2, "title": "Latest Research in Pediatric Brain Tumors", "url": "#", "source": "pubmed", "x": 2.1, "y": 2.5, "z": -0.9, "clusterId": 2},
+    {"id": 3, "title": "Neuroblastoma Treatment Options 2024", "url": "#", "source": "curated", "x": 2.5, "y": -1.2, "z": 1.8, "clusterId": 3},
+    {"id": 4, "title": "Managing Chemotherapy Side Effects in Children", "url": "#", "source": "internal", "x": -0.6, "y": -1.8, "z": -0.2, "clusterId": 4},
+    {"id": 5, "title": "Finding Support: Resources for Families", "url": "#", "source": "curated", "x": -3.3, "y": -0.2, "z": 2.3, "clusterId": 5}
+  ],
+  "regions": [
+    {"geo_code": "US-CA", "name": "California", "latitude": 36.116203, "longitude": -119.681564, "interest": 89, "svi_overall": 0.52, "population": 39538223},
+    {"geo_code": "US-TX", "name": "Texas", "latitude": 31.054487, "longitude": -97.563461, "interest": 76, "svi_overall": 0.58, "population": 29145505},
+    {"geo_code": "US-NY", "name": "New York", "latitude": 42.165726, "longitude": -74.948051, "interest": 72, "svi_overall": 0.48, "population": 20201249},
+    {"geo_code": "US-FL", "name": "Florida", "latitude": 27.766279, "longitude": -81.686783, "interest": 68, "svi_overall": 0.55, "population": 21538187},
+    {"geo_code": "US-IL", "name": "Illinois", "latitude": 40.349457, "longitude": -88.986137, "interest": 62, "svi_overall": 0.51, "population": 12812508},
+    {"geo_code": "US-PA", "name": "Pennsylvania", "latitude": 40.590752, "longitude": -77.209755, "interest": 58, "svi_overall": 0.49, "population": 13002700},
+    {"geo_code": "US-OH", "name": "Ohio", "latitude": 40.388783, "longitude": -82.764915, "interest": 55, "svi_overall": 0.54, "population": 11799448},
+    {"geo_code": "US-GA", "name": "Georgia", "latitude": 33.040619, "longitude": -83.643074, "interest": 52, "svi_overall": 0.57, "population": 10711908}
+  ],
+  "taxonomy": {
+    "categories": [
+      {"name": "diagnosis", "count": 14, "subcategories": [{"name": "leukemia", "count": 5}, {"name": "brain_tumor", "count": 5}, {"name": "solid_tumor", "count": 4}]},
+      {"name": "treatment", "count": 6, "subcategories": [{"name": "chemotherapy", "count": 2}, {"name": "radiation", "count": 2}, {"name": "transplant", "count": 1}, {"name": "immunotherapy", "count": 1}]},
+      {"name": "support", "count": 4, "subcategories": [{"name": "community", "count": 1}, {"name": "facility", "count": 2}, {"name": "financial", "count": 1}]},
+      {"name": "survivorship", "count": 4, "subcategories": [{"name": "general", "count": 1}, {"name": "late_effects", "count": 2}, {"name": "follow_up", "count": 1}]}
+    ],
+    "total_terms": 28
+  }
+}
