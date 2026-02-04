@@ -37,11 +37,36 @@ class ClusterTrendResponse(BaseModel):
     data: list[dict]
 
 
+def generate_sample_trend_data(term_id: int, days: int = 90) -> list[dict]:
+    """Generate sample trend data for demo mode."""
+    import random
+    import math
+    random.seed(term_id)  # Consistent data per term
+
+    data = []
+    base_interest = 30 + random.random() * 40  # 30-70 base
+
+    for i in range(days):
+        date = datetime.utcnow() - timedelta(days=days - i)
+        # Add some variation: trend + seasonality + noise
+        trend = i * 0.1 * (1 if random.random() > 0.5 else -1)
+        seasonality = 10 * math.sin(i * 0.1)
+        noise = random.gauss(0, 8)
+        interest = max(0, min(100, base_interest + trend + seasonality + noise))
+
+        data.append({
+            "date": date.strftime("%Y-%m-%d"),
+            "interest": round(interest),
+        })
+
+    return data
+
+
 @router.get("/term/{term_id}")
 async def get_term_trends(
     term_id: int,
     db: Session = Depends(get_db),
-    geo_code: Optional[str] = Query("US"),
+    geo_code: Optional[str] = Query(None),  # Allow any geo_code
     days: int = Query(365, description="Number of days to fetch"),
 ):
     """Get trend data for a specific term."""
@@ -51,14 +76,30 @@ async def get_term_trends(
 
     cutoff = datetime.utcnow() - timedelta(days=days)
 
-    trends = (
-        db.query(TrendData)
-        .filter(TrendData.term_id == term_id)
-        .filter(TrendData.date >= cutoff)
-        .filter(TrendData.geo_code == geo_code)
-        .order_by(TrendData.date)
-        .all()
-    )
+    # Try to get real data - try with geo_code first, then without
+    query = db.query(TrendData).filter(TrendData.term_id == term_id).filter(TrendData.date >= cutoff)
+
+    if geo_code:
+        trends = query.filter(TrendData.geo_code == geo_code).order_by(TrendData.date).all()
+    else:
+        trends = []
+
+    # If no data with specific geo_code, try country level
+    if not trends:
+        trends = query.filter(TrendData.geo_level == 'country').order_by(TrendData.date).all()
+
+    # If still no data, try any data for this term
+    if not trends:
+        trends = query.order_by(TrendData.date).all()
+
+    # If still no real data, generate sample data for demo
+    if not trends:
+        return {
+            "term_id": term.id,
+            "term": term.term,
+            "data": generate_sample_trend_data(term_id, min(days, 90)),
+            "demo_mode": True,
+        }
 
     return {
         "term_id": term.id,
@@ -70,6 +111,7 @@ async def get_term_trends(
             }
             for t in trends
         ],
+        "demo_mode": False,
     }
 
 
@@ -77,7 +119,7 @@ async def get_term_trends(
 async def get_cluster_trends(
     cluster_id: int,
     db: Session = Depends(get_db),
-    geo_code: Optional[str] = Query("US"),
+    geo_code: Optional[str] = Query(None),
     days: int = Query(365),
 ):
     """Get aggregated trend data for all terms in a cluster."""
@@ -96,18 +138,36 @@ async def get_cluster_trends(
     term_ids = [t[0] for t in term_ids]
 
     if not term_ids:
-        return {"cluster_id": cluster_id, "cluster_name": cluster.name, "data": []}
+        return {"cluster_id": cluster_id, "cluster_name": cluster.name, "data": [], "demo_mode": True}
 
-    # Aggregate trends by date
-    aggregated = (
+    # Try to aggregate trends by date
+    query = (
         db.query(TrendData.date, func.avg(TrendData.interest).label("avg_interest"))
         .filter(TrendData.term_id.in_(term_ids))
         .filter(TrendData.date >= cutoff)
-        .filter(TrendData.geo_code == geo_code)
-        .group_by(TrendData.date)
-        .order_by(TrendData.date)
-        .all()
     )
+
+    if geo_code:
+        aggregated = query.filter(TrendData.geo_code == geo_code).group_by(TrendData.date).order_by(TrendData.date).all()
+    else:
+        aggregated = []
+
+    # If no data with specific geo_code, try country level
+    if not aggregated:
+        aggregated = query.filter(TrendData.geo_level == 'country').group_by(TrendData.date).order_by(TrendData.date).all()
+
+    # If still no data, try any data
+    if not aggregated:
+        aggregated = query.group_by(TrendData.date).order_by(TrendData.date).all()
+
+    # If still no real data, generate sample data for demo
+    if not aggregated:
+        return {
+            "cluster_id": cluster.id,
+            "cluster_name": cluster.name,
+            "data": generate_sample_trend_data(cluster_id, min(days, 90)),
+            "demo_mode": True,
+        }
 
     return {
         "cluster_id": cluster.id,
@@ -119,6 +179,7 @@ async def get_cluster_trends(
             }
             for row in aggregated
         ],
+        "demo_mode": False,
     }
 
 
