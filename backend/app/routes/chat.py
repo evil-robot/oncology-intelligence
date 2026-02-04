@@ -14,7 +14,14 @@ from ..config import get_settings
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 settings = get_settings()
-client = OpenAI(api_key=settings.openai_api_key)
+
+# Only initialize OpenAI client if API key is configured
+client = None
+if settings.openai_api_key:
+    try:
+        client = OpenAI(api_key=settings.openai_api_key)
+    except Exception as e:
+        print(f"Warning: Could not initialize OpenAI client: {e}")
 
 
 class ChatMessage(BaseModel):
@@ -178,11 +185,12 @@ Current data context will be provided with each query."""
 async def chat(request: ChatRequest):
     """Process a chat message and return an AI-generated response."""
 
-    if not settings.openai_api_key:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
-    # Gather data context
+    # Gather data context (needed for both AI and fallback responses)
     context = get_data_context(request.context_filter)
+
+    # If OpenAI is not configured, return a helpful fallback response
+    if not client or not settings.openai_api_key:
+        return generate_fallback_response(request.message, context)
 
     # Build messages for OpenAI
     messages = [
@@ -222,6 +230,82 @@ async def chat(request: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+
+
+def generate_fallback_response(query: str, context: dict) -> ChatResponse:
+    """Generate a helpful response without OpenAI by analyzing the query and context."""
+    query_lower = query.lower()
+
+    response_parts = []
+
+    # Check for trending/popular questions
+    if any(word in query_lower for word in ['trending', 'popular', 'top', 'most']):
+        if context.get('top_trending'):
+            trending = context['top_trending'][:5]
+            terms_list = ', '.join([f"**{t['term']}** ({t['category']})" for t in trending])
+            response_parts.append(f"📈 **Top Trending Terms:**\n{terms_list}")
+
+    # Check for category questions
+    if any(word in query_lower for word in ['category', 'categories', 'types', 'breakdown']):
+        if context.get('categories'):
+            cats = context['categories'][:5]
+            cat_list = '\n'.join([f"• {c['category'].replace('_', ' ').title()}: {c['count']} terms" for c in cats])
+            response_parts.append(f"📊 **Categories:**\n{cat_list}")
+
+    # Check for cluster questions
+    if any(word in query_lower for word in ['cluster', 'group', 'semantic']):
+        if context.get('clusters'):
+            clusters = context['clusters'][:5]
+            cluster_list = '\n'.join([f"• {c['name']}: {c['term_count']} terms" for c in clusters])
+            response_parts.append(f"🔮 **Semantic Clusters:**\n{cluster_list}")
+
+    # Check for regional/geographic questions
+    if any(word in query_lower for word in ['region', 'geographic', 'state', 'area', 'sdoh', 'vulnerability']):
+        if context.get('high_vulnerability_regions'):
+            regions = context['high_vulnerability_regions'][:5]
+            region_list = '\n'.join([f"• {r['name']}: SVI {r['svi']:.2f}" for r in regions if r['svi']])
+            response_parts.append(f"🗺️ **High Vulnerability Regions (by SDOH):**\n{region_list}")
+
+    # Check for spike/anomaly questions
+    if any(word in query_lower for word in ['spike', 'anomaly', 'unusual', 'sudden']):
+        if context.get('recent_spikes'):
+            spikes = context['recent_spikes']
+            spike_list = '\n'.join([f"• {s['term']}: {s['interest']}% interest on {s['date']}" for s in spikes])
+            response_parts.append(f"⚡ **Recent Spikes:**\n{spike_list}")
+
+    # Default: show summary stats
+    if not response_parts:
+        stats = f"""📊 **Dashboard Overview:**
+• Total search terms tracked: {context.get('total_terms', 0)}
+• Semantic clusters: {context.get('total_clusters', 0)}
+• Trend data points: {context.get('total_trend_points', 0)}
+
+💡 **Try asking about:**
+• "What terms are trending?"
+• "Show me the categories"
+• "Which regions have high vulnerability?"
+• "Any recent spikes in search activity?"
+
+*Note: Full AI chat requires OpenAI API key configuration.*"""
+        response_parts.append(stats)
+
+    # Add note about limited mode
+    response_parts.append("\n\n*ℹ️ Running in data-only mode. For conversational AI, configure OPENAI_API_KEY.*")
+
+    return ChatResponse(
+        response='\n\n'.join(response_parts),
+        sources=[
+            {"type": "terms", "count": context.get("total_terms", 0)},
+            {"type": "trend_points", "count": context.get("total_trend_points", 0)},
+            {"type": "clusters", "count": context.get("total_clusters", 0)}
+        ],
+        suggested_questions=[
+            "What terms are trending?",
+            "Show me the categories breakdown",
+            "Which regions have high SDOH vulnerability?",
+            "Any recent spikes in activity?"
+        ]
+    )
 
 
 def generate_suggestions(query: str, context: dict) -> List[str]:
