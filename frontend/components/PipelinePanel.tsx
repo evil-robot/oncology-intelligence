@@ -216,42 +216,51 @@ export default function PipelinePanel() {
 
       {/* Progress Bar (when running) */}
       {isRunning && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">{statusMessage}</span>
-            <span className="text-cyan-400">{progress.toFixed(0)}%</span>
+        <div className="space-y-3 p-3 bg-gradient-to-br from-cyan-500/10 to-pink-500/10 border border-cyan-500/30 rounded-lg">
+          {/* Big progress percentage */}
+          <div className="text-center">
+            <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-400">
+              {progress.toFixed(0)}%
+            </div>
+            <div className="text-sm text-gray-300 mt-1">{statusMessage}</div>
           </div>
-          <div className="h-2 bg-surface rounded-full overflow-hidden">
+
+          {/* Large progress bar */}
+          <div className="h-4 bg-surface rounded-full overflow-hidden shadow-inner">
             <div
-              className="h-full bg-gradient-to-r from-cyan-500 to-pink-500 transition-all duration-500"
+              className="h-full bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 transition-all duration-500 relative"
               style={{ width: `${progress}%` }}
-            />
+            >
+              <div className="absolute inset-0 bg-white/20 animate-pulse" />
+            </div>
           </div>
-          <div className="flex justify-between text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Elapsed: {formatTime(elapsedTime)}
+
+          {/* Time info */}
+          <div className="flex justify-between text-sm">
+            <span className="flex items-center gap-2 text-cyan-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {formatTime(elapsedTime)} elapsed
             </span>
-            <span>Est. remaining: ~{formatTime(remainingTime)}</span>
+            <span className="text-pink-400">~{formatTime(remainingTime)} remaining</span>
           </div>
 
           {/* Step indicators */}
-          <div className="flex justify-between text-[10px] mt-2">
+          <div className="flex justify-between pt-2 border-t border-white/10">
             <div className={`flex flex-col items-center ${progress > 0 ? 'text-cyan-400' : 'text-gray-600'}`}>
-              <div className={`w-2 h-2 rounded-full ${progress > 0 ? 'bg-cyan-400' : 'bg-gray-600'}`} />
-              <span>Taxonomy</span>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 0 ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50' : 'bg-gray-600'}`} />
+              <span className="text-xs mt-1">Taxonomy</span>
             </div>
             <div className={`flex flex-col items-center ${progress > 20 ? 'text-cyan-400' : 'text-gray-600'}`}>
-              <div className={`w-2 h-2 rounded-full ${progress > 20 ? 'bg-cyan-400' : 'bg-gray-600'}`} />
-              <span>Embeddings</span>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 20 ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50' : 'bg-gray-600'}`} />
+              <span className="text-xs mt-1">Embeddings</span>
             </div>
             <div className={`flex flex-col items-center ${progress > 40 ? 'text-pink-400' : 'text-gray-600'}`}>
-              <div className={`w-2 h-2 rounded-full ${progress > 40 ? 'bg-pink-400' : 'bg-gray-600'}`} />
-              <span>Trends</span>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 40 ? 'bg-pink-400 shadow-lg shadow-pink-400/50 animate-pulse' : 'bg-gray-600'}`} />
+              <span className="text-xs mt-1">Trends</span>
             </div>
             <div className={`flex flex-col items-center ${progress > 90 ? 'text-green-400' : 'text-gray-600'}`}>
-              <div className={`w-2 h-2 rounded-full ${progress > 90 ? 'bg-green-400' : 'bg-gray-600'}`} />
-              <span>SDOH</span>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 90 ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`} />
+              <span className="text-xs mt-1">SDOH</span>
             </div>
           </div>
         </div>
@@ -269,21 +278,23 @@ export default function PipelinePanel() {
       <button
         onClick={startPipeline}
         disabled={isRunning}
-        className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all ${
+        className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
           isRunning
             ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-            : 'bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-400 hover:to-pink-400 text-white'
+            : hasTrendData
+              ? 'bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-400 hover:to-pink-400 text-white'
+              : 'bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-400 hover:to-pink-400 text-white animate-pulse shadow-lg shadow-cyan-500/30'
         }`}
       >
         {isRunning ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Fetching Real Data...
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-base">Fetching Real Data...</span>
           </>
         ) : (
           <>
-            <Play className="w-4 h-4" />
-            {hasTrendData ? 'Refresh Google Trends Data' : 'Fetch Real Google Trends Data'}
+            <Play className="w-5 h-5" />
+            <span className="text-base">{hasTrendData ? 'Refresh Trends Data' : '▶ Fetch Real Google Trends'}</span>
           </>
         )}
       </button>
