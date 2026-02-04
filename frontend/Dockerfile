@@ -6,8 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copy source code
+# Copy source code and ensure public exists
 COPY . .
+RUN mkdir -p public
 
 # Build argument for API URL
 ARG NEXT_PUBLIC_API_URL
