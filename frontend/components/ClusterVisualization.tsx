@@ -99,13 +99,15 @@ function GridPlanes({ size = 12 }: { size?: number }) {
 }
 
 // Glowing data point
-function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue }: {
+function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue, showLabels, pointSize }: {
   term: Term
   isSelected: boolean
   isHovered: boolean
   onClick: () => void
   onHover: (hovered: boolean) => void
   colorValue: number // 0-1 for color gradient
+  showLabels: boolean
+  pointSize: number
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
@@ -131,11 +133,14 @@ function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue }
 
   const pointColor = isSelected ? COLORS.accent : isHovered ? COLORS.secondary : baseColor
 
+  const baseSize = 0.06 * pointSize
+  const glowSize = 0.12 * pointSize
+
   return (
     <group position={[term.x, term.y, term.z]}>
       {/* Glow sphere */}
       <mesh ref={glowRef}>
-        <sphereGeometry args={[0.12, 16, 16]} />
+        <sphereGeometry args={[glowSize, 16, 16]} />
         <meshBasicMaterial
           color={pointColor}
           transparent
@@ -150,12 +155,12 @@ function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue }
         onPointerOver={(e) => { e.stopPropagation(); onHover(true) }}
         onPointerOut={() => onHover(false)}
       >
-        <sphereGeometry args={[0.06, 16, 16]} />
+        <sphereGeometry args={[baseSize, 16, 16]} />
         <meshBasicMaterial color={pointColor} />
       </mesh>
 
       {/* Label */}
-      {(isHovered || isSelected) && (
+      {showLabels && (isHovered || isSelected) && (
         <Html center zIndexRange={[100, 200]} style={{ transform: 'translateY(-25px)' }}>
           <div style={labelStyle}>
             <div style={{ color: COLORS.primary, marginBottom: '2px' }}>{term.term}</div>
@@ -605,6 +610,8 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
           onClick={() => selectAndFocusTerm(term)}
           onHover={(h) => setHoveredTerm(h ? term : null)}
           colorValue={termColorValues.get(term.id) || 0}
+          showLabels={view.showLabels}
+          pointSize={view.pointSize}
         />
       ))}
 
