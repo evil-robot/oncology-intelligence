@@ -13,6 +13,7 @@ import InsightsPanel from '@/components/InsightsPanel'
 import ExplainerPanel from '@/components/ExplainerPanel'
 import ChatPanel from '@/components/ChatPanel'
 import DataSourcesPanel from '@/components/DataSourcesPanel'
+import PipelinePanel from '@/components/PipelinePanel'
 
 // Dynamic import for Three.js component (no SSR)
 const ClusterVisualization = dynamic(
@@ -115,9 +116,10 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Right Sidebar - Detail Panel & Data Sources */}
+        {/* Right Sidebar - Detail Panel, Pipeline & Data Sources */}
         <aside className="w-96 flex-shrink-0 border-l border-border p-4 overflow-y-auto space-y-4">
           <DetailPanel />
+          <PipelinePanel />
           <DataSourcesPanel />
         </aside>
       </main>
