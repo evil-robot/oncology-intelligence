@@ -171,7 +171,7 @@ function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue }
   )
 }
 
-// Cluster marker - glowing orb
+// Cluster marker - glowing orb (decorative, doesn't block clicks)
 function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
   cluster: Cluster
   isSelected: boolean
@@ -185,6 +185,9 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
   const clusterColor = useMemo(() => {
     return cluster.color || COLORS.secondary
   }, [cluster.color])
+
+  // Disable raycasting on decorative meshes
+  const noRaycast = useCallback(() => {}, [])
 
   useFrame(({ clock }) => {
     if (groupRef.current) {
@@ -205,8 +208,8 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
 
   return (
     <group position={[cluster.x, cluster.y, cluster.z]} ref={groupRef}>
-      {/* Outer glow rings */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
+      {/* Outer glow rings - decorative only, no raycast */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
         <ringGeometry args={[orbSize * 1.5, orbSize * 1.8, 32]} />
         <meshBasicMaterial
           color={clusterColor}
@@ -216,13 +219,8 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
         />
       </mesh>
 
-      {/* Inner core */}
-      <mesh
-        ref={innerRef}
-        onClick={(e) => { e.stopPropagation(); onClick() }}
-        onPointerOver={(e) => { e.stopPropagation(); onHover(true) }}
-        onPointerOut={() => onHover(false)}
-      >
+      {/* Inner orb - decorative only, no raycast */}
+      <mesh ref={innerRef} raycast={noRaycast}>
         <icosahedronGeometry args={[orbSize, 1]} />
         <meshBasicMaterial
           color={clusterColor}
@@ -230,6 +228,16 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
           opacity={isSelected ? 0.9 : isHovered ? 0.7 : 0.5}
           wireframe={!isSelected && !isHovered}
         />
+      </mesh>
+
+      {/* Small clickable core marker - this IS clickable */}
+      <mesh
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+        onPointerOver={(e) => { e.stopPropagation(); onHover(true) }}
+        onPointerOut={() => onHover(false)}
+      >
+        <sphereGeometry args={[orbSize * 0.3, 16, 16]} />
+        <meshBasicMaterial color={clusterColor} transparent opacity={0} />
       </mesh>
 
       {/* Label */}
