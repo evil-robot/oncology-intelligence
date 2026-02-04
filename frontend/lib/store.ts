@@ -159,31 +159,62 @@ export const useStore = create<AppState>((set, get) => ({
     })),
   focusOnCategory: (category) => {
     const state = get()
-    const categoryTerms = state.terms.filter(
-      (t) => t.category?.toLowerCase() === category.toLowerCase()
+
+    // Try exact match first, then lowercase match
+    let categoryTerms = state.terms.filter(
+      (t) => t.category === category
     )
 
-    if (categoryTerms.length === 0) return
+    // Fallback to case-insensitive
+    if (categoryTerms.length === 0) {
+      categoryTerms = state.terms.filter(
+        (t) => t.category?.toLowerCase() === category.toLowerCase()
+      )
+    }
+
+    console.log(`focusOnCategory: ${category}, found ${categoryTerms.length} terms`)
+
+    if (categoryTerms.length === 0) {
+      // Just set the filter even if no terms found
+      set({
+        filters: { ...state.filters, category },
+      })
+      return
+    }
+
+    // Filter out terms without valid coordinates
+    const termsWithCoords = categoryTerms.filter(
+      (t) => t.x !== 0 || t.y !== 0 || t.z !== 0
+    )
+
+    // Use terms with coords, or fall back to all terms
+    const validTerms = termsWithCoords.length > 0 ? termsWithCoords : categoryTerms
 
     // Calculate center of all terms in this category
-    const sumX = categoryTerms.reduce((acc, t) => acc + t.x, 0)
-    const sumY = categoryTerms.reduce((acc, t) => acc + t.y, 0)
-    const sumZ = categoryTerms.reduce((acc, t) => acc + t.z, 0)
-    const centerX = sumX / categoryTerms.length
-    const centerY = sumY / categoryTerms.length
-    const centerZ = sumZ / categoryTerms.length
+    const sumX = validTerms.reduce((acc, t) => acc + (t.x || 0), 0)
+    const sumY = validTerms.reduce((acc, t) => acc + (t.y || 0), 0)
+    const sumZ = validTerms.reduce((acc, t) => acc + (t.z || 0), 0)
+    const centerX = sumX / validTerms.length
+    const centerY = sumY / validTerms.length
+    const centerZ = sumZ / validTerms.length
 
     // Calculate spread to determine zoom distance
-    const maxDist = Math.max(
-      ...categoryTerms.map((t) =>
-        Math.sqrt(
-          Math.pow(t.x - centerX, 2) +
-          Math.pow(t.y - centerY, 2) +
-          Math.pow(t.z - centerZ, 2)
-        )
+    const distances = validTerms.map((t) =>
+      Math.sqrt(
+        Math.pow((t.x || 0) - centerX, 2) +
+        Math.pow((t.y || 0) - centerY, 2) +
+        Math.pow((t.z || 0) - centerZ, 2)
       )
     )
+    const maxDist = distances.length > 0 ? Math.max(...distances) : 5
     const zoomDistance = Math.max(maxDist * 1.5, 5)
+
+    // Add small unique offset based on category name hash to ensure different positions
+    const categoryHash = category.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    const offsetX = (categoryHash % 10) * 0.3 - 1.5
+    const offsetY = ((categoryHash * 7) % 10) * 0.3 - 1.5
+
+    console.log(`Camera position: [${centerX + offsetX}, ${centerY + zoomDistance * 0.3 + offsetY}, ${centerZ + zoomDistance}]`)
 
     set({
       filters: { ...state.filters, category },
@@ -191,7 +222,7 @@ export const useStore = create<AppState>((set, get) => ({
       view: {
         ...state.view,
         cameraTarget: [centerX, centerY, centerZ],
-        cameraPosition: [centerX, centerY + zoomDistance * 0.3, centerZ + zoomDistance],
+        cameraPosition: [centerX + offsetX, centerY + zoomDistance * 0.3 + offsetY, centerZ + zoomDistance],
       },
     })
   },
