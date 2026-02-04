@@ -61,7 +61,7 @@ export default function HomePage() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-background flex flex-col">
       {/* Header */}
-      <header className="flex-shrink-0 border-b border-border px-6 py-3 flex items-center justify-between">
+      <header className="flex-shrink-0 border-b border-border px-6 py-3 flex items-center justify-between relative z-50">
         <div className="flex items-center gap-4">
           <SuperTruthLogo className="h-8 w-auto" />
           <div className="border-l border-border pl-4">
