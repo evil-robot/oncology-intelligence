@@ -138,7 +138,7 @@ export default function PipelinePanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fetch_trends: true,
-          timeframe: 'today 12-m',
+          timeframe: 'today 5-y',  // 5 years of data
           geo: 'US',
         }),
       })
@@ -290,7 +290,7 @@ export default function PipelinePanel() {
 
       {/* Info */}
       <p className="text-[10px] text-gray-500 text-center">
-        Fetches real search interest data from Google Trends for all {stats?.terms || '~100'} terms.
+        Fetches 5 years of Google Trends data for all {stats?.terms || '~300'} terms.
         Takes ~{formatTime(estimatedTotalTime)} due to API rate limits.
       </p>
     </div>

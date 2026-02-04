@@ -30,7 +30,7 @@ class PipelineConfig(BaseModel):
     """Configuration for pipeline run."""
 
     fetch_trends: bool = True
-    timeframe: str = "today 12-m"
+    timeframe: str = "today 5-y"  # 5 years of data
     geo: str = "US"
 
 

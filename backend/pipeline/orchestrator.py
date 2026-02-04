@@ -40,7 +40,7 @@ class PipelineOrchestrator:
     async def run_full_pipeline(
         self,
         fetch_trends: bool = True,
-        timeframe: str = "today 12-m",
+        timeframe: str = "today 5-y",  # 5 years of historical data
         geo: str = "US",
     ) -> PipelineRun:
         """
