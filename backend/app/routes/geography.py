@@ -105,13 +105,24 @@ async def get_region(
 
 
 def generate_demo_regional_interest(geo_code: str, term_id: Optional[int] = None) -> float:
-    """Generate consistent demo interest for a region."""
+    """Generate consistent but varied demo interest for a region."""
     import hashlib
-    # Create a hash from geo_code and term_id for consistent random-ish values
-    seed_str = f"{geo_code}-{term_id or 0}"
+    # Create a hash from just the geo_code to get unique values per state
+    # This ensures each state has a different interest level
+    seed_str = f"interest-{geo_code}"
     hash_val = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-    # Generate interest between 20-80
-    return 20 + (hash_val % 60)
+    # Generate interest between 25-95 for good variation
+    base_interest = 25 + (hash_val % 70)
+
+    # If a specific term is selected, add some variation
+    if term_id:
+        term_seed = f"{geo_code}-term-{term_id}"
+        term_hash = int(hashlib.md5(term_seed.encode()).hexdigest()[:8], 16)
+        # Add/subtract up to 15 points based on term
+        adjustment = (term_hash % 30) - 15
+        base_interest = max(10, min(100, base_interest + adjustment))
+
+    return float(base_interest)
 
 
 @router.get("/heatmap")
