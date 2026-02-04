@@ -229,24 +229,15 @@ export default function FilterPanel() {
       <div className="space-y-2">
         <p className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1">
           <MapPin className="w-3 h-3" />
-          Geography
+          Geography (US Only)
         </p>
         <select
           value={filters.geoCode}
           onChange={(e) => setFilter('geoCode', e.target.value)}
           className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
         >
-          <optgroup label="Countries">
-            <option value="US">🇺🇸 United States</option>
-            <option value="GB">🇬🇧 United Kingdom</option>
-            <option value="CA">🇨🇦 Canada</option>
-            <option value="AU">🇦🇺 Australia</option>
-            <option value="DE">🇩🇪 Germany</option>
-            <option value="FR">🇫🇷 France</option>
-            <option value="JP">🇯🇵 Japan</option>
-            <option value="">🌍 Worldwide</option>
-          </optgroup>
-          <optgroup label="US States">
+          <option value="US">🇺🇸 All United States</option>
+          <optgroup label="States">
             <option value="US-CA">California</option>
             <option value="US-TX">Texas</option>
             <option value="US-NY">New York</option>
@@ -257,6 +248,11 @@ export default function FilterPanel() {
             <option value="US-GA">Georgia</option>
             <option value="US-NC">North Carolina</option>
             <option value="US-MI">Michigan</option>
+            <option value="US-AZ">Arizona</option>
+            <option value="US-WA">Washington</option>
+            <option value="US-MA">Massachusetts</option>
+            <option value="US-CO">Colorado</option>
+            <option value="US-TN">Tennessee</option>
           </optgroup>
         </select>
       </div>
