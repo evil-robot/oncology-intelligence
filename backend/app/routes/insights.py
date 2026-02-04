@@ -17,42 +17,64 @@ async def insights_health():
 
 
 def get_sample_insights(db: Session) -> list[dict]:
-    """Return sample insights using REAL terms from the database."""
+    """Return sample insights using REAL terms from the database, spread across categories."""
     from app.models import SearchTerm
     import random
+    from collections import defaultdict
 
     now = datetime.utcnow().isoformat()
 
-    # Get actual terms from the database
-    terms = db.query(SearchTerm).limit(50).all()
+    # Get actual terms from the database grouped by category
+    all_terms = db.query(SearchTerm).all()
 
-    if not terms:
+    if not all_terms:
         return []
 
-    # Shuffle and pick terms for different insight types
-    random.seed(42)  # Consistent results
-    shuffled = list(terms)
-    random.shuffle(shuffled)
+    # Group terms by category
+    terms_by_category = defaultdict(list)
+    for term in all_terms:
+        if term.category:
+            terms_by_category[term.category].append(term)
+
+    # Use deterministic random for consistent demo results
+    random.seed(42)
 
     insights = []
 
-    # Generate insights from real terms
-    insight_templates = [
-        ("spike", "high", "Spike detected: {term}", "Search interest jumped {pct}% above average. Current: {curr}, Baseline: {base}"),
-        ("emerging", "high", "Emerging topic: {term}", "Consistent {pct}% growth over recent weeks. Early avg: {base} → Recent avg: {curr}"),
-        ("spike", "medium", "Spike detected: {term}", "Search interest increased {pct}% with new developments. Current: {curr}, Baseline: {base}"),
-        ("regional_outlier", "medium", "High regional interest: {term}", "Regional interest shows {curr} vs national avg of {base}"),
-        ("emerging", "medium", "Emerging topic: {term}", "Growing awareness driving {pct}% increase. Early avg: {base} → Recent avg: {curr}"),
-        ("regional_outlier", "medium", "Regional pattern: {term}", "Geographic variation detected: {curr} vs baseline {base}"),
-        ("correlation", "low", "Correlated trends: {term}", "Shows strong correlation with related search topics"),
-        ("drop", "low", "Drop detected: {term}", "Search interest dropped {pct}% recently. Current: {curr}, Baseline: {base}"),
+    # Priority categories for insights - reflecting actual taxonomy
+    priority_categories = [
+        ("treatment", "spike", "high", "Treatment breakthrough: {term}", "Search interest surged {pct}% following recent developments. Current: {curr}, Baseline: {base}"),
+        ("emerging", "emerging", "high", "Emerging therapy: {term}", "Consistent {pct}% growth in searches as clinical data emerges. Early avg: {base} → Recent avg: {curr}"),
+        ("clinical_trials", "spike", "medium", "Clinical trial interest: {term}", "Search volume up {pct}% - possibly new trial results announced. Current: {curr}, Baseline: {base}"),
+        ("pediatric_oncology", "regional_outlier", "high", "Regional concern: {term}", "Florida showing {curr} search interest vs national avg of {base} - potential cluster"),
+        ("rare_genetic", "emerging", "medium", "Rising awareness: {term}", "Awareness growing with {pct}% increase in searches. Early avg: {base} → Recent avg: {curr}"),
+        ("adult_oncology", "spike", "medium", "Spike detected: {term}", "Search interest increased {pct}% in recent weeks. Current: {curr}, Baseline: {base}"),
+        ("symptoms", "regional_outlier", "medium", "Geographic pattern: {term}", "California shows elevated searches at {curr} vs national avg {base}"),
+        ("caregiver", "emerging", "medium", "Growing need: {term}", "Caregiver searches up {pct}% - may indicate resource gap. Early avg: {base} → Recent avg: {curr}"),
+        ("diagnosis", "spike", "low", "Diagnostic interest: {term}", "Search interest for diagnostic testing up {pct}%. Current: {curr}, Baseline: {base}"),
+        ("survivorship", "correlation", "low", "Correlated trends: {term}", "Shows strong correlation with treatment completion searches"),
+        ("costs", "spike", "medium", "Financial concern: {term}", "Searches about costs spiked {pct}% - affordability concerns. Current: {curr}, Baseline: {base}"),
+        ("rare_neurological", "emerging", "medium", "Emerging awareness: {term}", "Neurological condition searches growing {pct}%. Early avg: {base} → Recent avg: {curr}"),
+        ("prevention", "spike", "low", "Screening interest: {term}", "Prevention searches up {pct}% - possibly awareness campaign. Current: {curr}, Baseline: {base}"),
+        ("integrative", "regional_outlier", "low", "Regional pattern: {term}", "West Coast shows higher interest at {curr} vs national {base}"),
+        ("rare_cancer", "emerging", "high", "Rare cancer awareness: {term}", "Searches growing {pct}% - may indicate unmet need. Early avg: {base} → Recent avg: {curr}"),
     ]
 
-    for i, term in enumerate(shuffled[:10]):
-        template = insight_templates[i % len(insight_templates)]
-        insight_type, severity, title_tpl, desc_tpl = template
+    geo_map = {
+        3: "US-FL",
+        6: "US-CA",
+        13: "US-WA",
+    }
 
-        # Generate realistic random values
+    for i, (category, insight_type, severity, title_tpl, desc_tpl) in enumerate(priority_categories):
+        # Get a term from this category if available
+        if category in terms_by_category and terms_by_category[category]:
+            term = random.choice(terms_by_category[category])
+        else:
+            # Fallback to any term
+            term = random.choice(all_terms)
+
+        # Generate realistic random values based on insight type
         if insight_type == "drop":
             base_val = random.randint(50, 80)
             curr_val = random.randint(30, base_val - 10)
@@ -62,8 +84,6 @@ def get_sample_insights(db: Session) -> list[dict]:
             curr_val = random.randint(base_val + 10, 95)
             pct = round((curr_val - base_val) / base_val * 100)
 
-        geo_codes = [None, None, None, "US-FL", None, "US-CA", None, None]
-
         insights.append({
             "type": insight_type,
             "severity": severity,
@@ -72,12 +92,16 @@ def get_sample_insights(db: Session) -> list[dict]:
             "term_id": term.id,
             "term_name": term.term,
             "cluster_id": term.cluster_id,
-            "geo_code": geo_codes[i % len(geo_codes)],
+            "geo_code": geo_map.get(i),
             "metric_value": float(curr_val),
             "baseline_value": float(base_val),
             "percent_change": float(pct),
             "detected_at": now,
         })
+
+    # Sort by severity for display
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    insights.sort(key=lambda x: severity_order.get(x["severity"], 2))
 
     return insights
 

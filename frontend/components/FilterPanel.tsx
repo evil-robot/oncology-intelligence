@@ -46,24 +46,42 @@ export default function FilterPanel() {
     // Oncology
     pediatric_oncology: 'bg-blue-500',
     adult_oncology: 'bg-indigo-500',
+
+    // Treatment
     treatment: 'bg-green-500',
+
+    // Clinical Trials
+    clinical_trials: 'bg-cyan-500',
+
     // Rare Diseases
     rare_genetic: 'bg-purple-500',
     rare_neurological: 'bg-pink-500',
     rare_autoimmune: 'bg-rose-500',
-    rare_pulmonary: 'bg-cyan-500',
+    rare_pulmonary: 'bg-sky-500',
     rare_metabolic: 'bg-amber-500',
     rare_immune: 'bg-orange-500',
     rare_cancer: 'bg-red-500',
-    // Support
-    support: 'bg-teal-500',
-    survivorship: 'bg-emerald-500',
-    // Legacy
-    diagnosis: 'bg-blue-500',
+
+    // Symptoms & Diagnosis
     symptoms: 'bg-yellow-500',
-    caregiver: 'bg-orange-500',
-    clinical_trials: 'bg-cyan-500',
-    prognosis: 'bg-red-500',
+    diagnosis: 'bg-lime-500',
+
+    // Caregiver & Support
+    caregiver: 'bg-orange-400',
+    support: 'bg-teal-500',
+
+    // Survivorship
+    survivorship: 'bg-emerald-500',
+
+    // Costs & Financial
+    costs: 'bg-slate-500',
+
+    // Emerging & Integrative
+    emerging: 'bg-violet-500',
+    integrative: 'bg-fuchsia-500',
+
+    // Prevention
+    prevention: 'bg-green-400',
   }
 
   const handleTermClick = (term: Term) => {

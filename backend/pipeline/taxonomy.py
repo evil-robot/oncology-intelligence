@@ -438,6 +438,314 @@ SEED_TAXONOMY: list[TaxonomyTerm] = [
     TaxonomyTerm("oncology nutrition", "survivorship", "nutrition"),
     TaxonomyTerm("cancer and mental health", "survivorship", "mental_health"),
     TaxonomyTerm("cancer anxiety", "survivorship", "mental_health"),
+
+    # ============================================================================
+    # TREATMENTS - IMMUNOTHERAPY
+    # ============================================================================
+
+    TaxonomyTerm("immunotherapy cancer", "treatment", "immunotherapy"),
+    TaxonomyTerm("checkpoint inhibitor", "treatment", "immunotherapy"),
+    TaxonomyTerm("PD-1 inhibitor", "treatment", "immunotherapy"),
+    TaxonomyTerm("PD-L1 inhibitor", "treatment", "immunotherapy"),
+    TaxonomyTerm("Keytruda", "treatment", "immunotherapy"),
+    TaxonomyTerm("pembrolizumab", "treatment", "immunotherapy"),
+    TaxonomyTerm("Opdivo", "treatment", "immunotherapy"),
+    TaxonomyTerm("nivolumab", "treatment", "immunotherapy"),
+    TaxonomyTerm("Tecentriq", "treatment", "immunotherapy"),
+    TaxonomyTerm("atezolizumab", "treatment", "immunotherapy"),
+    TaxonomyTerm("Yervoy", "treatment", "immunotherapy"),
+    TaxonomyTerm("ipilimumab", "treatment", "immunotherapy"),
+    TaxonomyTerm("CTLA-4 inhibitor", "treatment", "immunotherapy"),
+    TaxonomyTerm("immunotherapy side effects", "treatment", "immunotherapy"),
+    TaxonomyTerm("immune checkpoint blockade", "treatment", "immunotherapy"),
+
+    # === CAR-T Therapy ===
+    TaxonomyTerm("CAR-T therapy", "treatment", "car_t"),
+    TaxonomyTerm("CAR T cell", "treatment", "car_t"),
+    TaxonomyTerm("Kymriah", "treatment", "car_t"),
+    TaxonomyTerm("tisagenlecleucel", "treatment", "car_t"),
+    TaxonomyTerm("Yescarta", "treatment", "car_t"),
+    TaxonomyTerm("axicabtagene ciloleucel", "treatment", "car_t"),
+    TaxonomyTerm("CAR-T side effects", "treatment", "car_t"),
+    TaxonomyTerm("cytokine release syndrome", "treatment", "car_t"),
+    TaxonomyTerm("CAR-T cost", "treatment", "car_t"),
+
+    # === Targeted Therapy ===
+    TaxonomyTerm("targeted therapy cancer", "treatment", "targeted"),
+    TaxonomyTerm("tyrosine kinase inhibitor", "treatment", "targeted"),
+    TaxonomyTerm("TKI cancer", "treatment", "targeted"),
+    TaxonomyTerm("Gleevec", "treatment", "targeted"),
+    TaxonomyTerm("imatinib", "treatment", "targeted"),
+    TaxonomyTerm("Herceptin", "treatment", "targeted"),
+    TaxonomyTerm("trastuzumab", "treatment", "targeted"),
+    TaxonomyTerm("Avastin", "treatment", "targeted"),
+    TaxonomyTerm("bevacizumab", "treatment", "targeted"),
+    TaxonomyTerm("Ibrance", "treatment", "targeted"),
+    TaxonomyTerm("palbociclib", "treatment", "targeted"),
+    TaxonomyTerm("Tagrisso", "treatment", "targeted"),
+    TaxonomyTerm("osimertinib", "treatment", "targeted"),
+    TaxonomyTerm("Lynparza", "treatment", "targeted"),
+    TaxonomyTerm("olaparib", "treatment", "targeted"),
+    TaxonomyTerm("PARP inhibitor", "treatment", "targeted"),
+    TaxonomyTerm("CDK4/6 inhibitor", "treatment", "targeted"),
+    TaxonomyTerm("BRAF inhibitor", "treatment", "targeted"),
+    TaxonomyTerm("MEK inhibitor", "treatment", "targeted"),
+    TaxonomyTerm("Tafinlar", "treatment", "targeted"),
+    TaxonomyTerm("Mekinist", "treatment", "targeted"),
+    TaxonomyTerm("Zelboraf", "treatment", "targeted"),
+    TaxonomyTerm("vemurafenib", "treatment", "targeted"),
+
+    # === Chemotherapy ===
+    TaxonomyTerm("chemotherapy", "treatment", "chemo"),
+    TaxonomyTerm("chemo side effects", "treatment", "chemo"),
+    TaxonomyTerm("chemotherapy drugs", "treatment", "chemo"),
+    TaxonomyTerm("neoadjuvant chemotherapy", "treatment", "chemo"),
+    TaxonomyTerm("adjuvant chemotherapy", "treatment", "chemo"),
+    TaxonomyTerm("chemo hair loss", "treatment", "chemo"),
+    TaxonomyTerm("chemo nausea", "treatment", "chemo"),
+    TaxonomyTerm("chemo port", "treatment", "chemo"),
+    TaxonomyTerm("taxol", "treatment", "chemo"),
+    TaxonomyTerm("paclitaxel", "treatment", "chemo"),
+    TaxonomyTerm("carboplatin", "treatment", "chemo"),
+    TaxonomyTerm("cisplatin", "treatment", "chemo"),
+    TaxonomyTerm("doxorubicin", "treatment", "chemo"),
+    TaxonomyTerm("FOLFOX", "treatment", "chemo"),
+    TaxonomyTerm("FOLFIRI", "treatment", "chemo"),
+    TaxonomyTerm("R-CHOP", "treatment", "chemo"),
+
+    # === Radiation ===
+    TaxonomyTerm("radiation therapy", "treatment", "radiation"),
+    TaxonomyTerm("radiation treatment", "treatment", "radiation"),
+    TaxonomyTerm("proton therapy", "treatment", "radiation"),
+    TaxonomyTerm("IMRT", "treatment", "radiation"),
+    TaxonomyTerm("SBRT", "treatment", "radiation"),
+    TaxonomyTerm("stereotactic radiosurgery", "treatment", "radiation"),
+    TaxonomyTerm("gamma knife", "treatment", "radiation"),
+    TaxonomyTerm("cyberknife", "treatment", "radiation"),
+    TaxonomyTerm("brachytherapy", "treatment", "radiation"),
+    TaxonomyTerm("radiation side effects", "treatment", "radiation"),
+    TaxonomyTerm("radiation burn", "treatment", "radiation"),
+
+    # === Surgery ===
+    TaxonomyTerm("cancer surgery", "treatment", "surgery"),
+    TaxonomyTerm("tumor removal", "treatment", "surgery"),
+    TaxonomyTerm("robotic surgery cancer", "treatment", "surgery"),
+    TaxonomyTerm("mastectomy", "treatment", "surgery"),
+    TaxonomyTerm("lumpectomy", "treatment", "surgery"),
+    TaxonomyTerm("prostatectomy", "treatment", "surgery"),
+    TaxonomyTerm("colectomy", "treatment", "surgery"),
+    TaxonomyTerm("lobectomy lung", "treatment", "surgery"),
+    TaxonomyTerm("Whipple procedure", "treatment", "surgery"),
+    TaxonomyTerm("lymph node dissection", "treatment", "surgery"),
+    TaxonomyTerm("sentinel node biopsy", "treatment", "surgery"),
+
+    # === Stem Cell Transplant ===
+    TaxonomyTerm("bone marrow transplant", "treatment", "transplant"),
+    TaxonomyTerm("stem cell transplant", "treatment", "transplant"),
+    TaxonomyTerm("autologous transplant", "treatment", "transplant"),
+    TaxonomyTerm("allogeneic transplant", "treatment", "transplant"),
+    TaxonomyTerm("cord blood transplant", "treatment", "transplant"),
+    TaxonomyTerm("graft versus host disease", "treatment", "transplant"),
+    TaxonomyTerm("GVHD", "treatment", "transplant"),
+    TaxonomyTerm("bone marrow donor", "treatment", "transplant"),
+    TaxonomyTerm("Be The Match", "treatment", "transplant"),
+
+    # === Gene Therapy ===
+    TaxonomyTerm("gene therapy", "treatment", "gene_therapy"),
+    TaxonomyTerm("gene therapy cancer", "treatment", "gene_therapy"),
+    TaxonomyTerm("CRISPR cancer", "treatment", "gene_therapy"),
+    TaxonomyTerm("gene editing", "treatment", "gene_therapy"),
+    TaxonomyTerm("Luxturna", "treatment", "gene_therapy"),
+    TaxonomyTerm("Zynteglo", "treatment", "gene_therapy"),
+    TaxonomyTerm("Casgevy", "treatment", "gene_therapy"),
+    TaxonomyTerm("Lyfgenia", "treatment", "gene_therapy"),
+
+    # ============================================================================
+    # CLINICAL TRIALS
+    # ============================================================================
+
+    TaxonomyTerm("clinical trial cancer", "clinical_trials", "general"),
+    TaxonomyTerm("cancer clinical trial", "clinical_trials", "general"),
+    TaxonomyTerm("clinical trials near me", "clinical_trials", "search"),
+    TaxonomyTerm("phase 1 clinical trial", "clinical_trials", "phases"),
+    TaxonomyTerm("phase 2 clinical trial", "clinical_trials", "phases"),
+    TaxonomyTerm("phase 3 clinical trial", "clinical_trials", "phases"),
+    TaxonomyTerm("experimental cancer treatment", "clinical_trials", "experimental"),
+    TaxonomyTerm("cancer research study", "clinical_trials", "research"),
+    TaxonomyTerm("enrolling in clinical trial", "clinical_trials", "enrollment"),
+    TaxonomyTerm("clinical trial eligibility", "clinical_trials", "enrollment"),
+    TaxonomyTerm("compassionate use", "clinical_trials", "access"),
+    TaxonomyTerm("expanded access program", "clinical_trials", "access"),
+    TaxonomyTerm("right to try", "clinical_trials", "access"),
+    TaxonomyTerm("clinical trial side effects", "clinical_trials", "safety"),
+    TaxonomyTerm("clinical trial placebo", "clinical_trials", "design"),
+    TaxonomyTerm("randomized clinical trial", "clinical_trials", "design"),
+    TaxonomyTerm("cancer vaccine trial", "clinical_trials", "vaccine"),
+    TaxonomyTerm("mRNA cancer vaccine", "clinical_trials", "vaccine"),
+
+    # ============================================================================
+    # SYMPTOMS & DIAGNOSIS
+    # ============================================================================
+
+    TaxonomyTerm("cancer symptoms", "symptoms", "general"),
+    TaxonomyTerm("early signs of cancer", "symptoms", "early_detection"),
+    TaxonomyTerm("unexplained weight loss", "symptoms", "systemic"),
+    TaxonomyTerm("fatigue cancer", "symptoms", "systemic"),
+    TaxonomyTerm("night sweats cancer", "symptoms", "systemic"),
+    TaxonomyTerm("persistent cough", "symptoms", "respiratory"),
+    TaxonomyTerm("blood in stool", "symptoms", "gi"),
+    TaxonomyTerm("blood in urine", "symptoms", "urological"),
+    TaxonomyTerm("lump in breast", "symptoms", "breast"),
+    TaxonomyTerm("breast lump", "symptoms", "breast"),
+    TaxonomyTerm("swollen lymph nodes", "symptoms", "lymphatic"),
+    TaxonomyTerm("enlarged lymph node", "symptoms", "lymphatic"),
+    TaxonomyTerm("skin changes cancer", "symptoms", "skin"),
+    TaxonomyTerm("mole changes", "symptoms", "skin"),
+    TaxonomyTerm("jaundice cancer", "symptoms", "hepatic"),
+    TaxonomyTerm("difficulty swallowing", "symptoms", "esophageal"),
+    TaxonomyTerm("rectal bleeding", "symptoms", "gi"),
+    TaxonomyTerm("bone pain cancer", "symptoms", "bone"),
+    TaxonomyTerm("headache brain tumor", "symptoms", "neurological"),
+    TaxonomyTerm("seizure cancer", "symptoms", "neurological"),
+    TaxonomyTerm("cancer misdiagnosis", "symptoms", "diagnosis"),
+
+    # === Diagnostic Tests ===
+    TaxonomyTerm("cancer blood test", "diagnosis", "blood_test"),
+    TaxonomyTerm("tumor markers", "diagnosis", "blood_test"),
+    TaxonomyTerm("PSA test", "diagnosis", "blood_test"),
+    TaxonomyTerm("CA-125 test", "diagnosis", "blood_test"),
+    TaxonomyTerm("CEA test", "diagnosis", "blood_test"),
+    TaxonomyTerm("liquid biopsy", "diagnosis", "biopsy"),
+    TaxonomyTerm("cancer biopsy", "diagnosis", "biopsy"),
+    TaxonomyTerm("PET scan cancer", "diagnosis", "imaging"),
+    TaxonomyTerm("CT scan cancer", "diagnosis", "imaging"),
+    TaxonomyTerm("MRI cancer", "diagnosis", "imaging"),
+    TaxonomyTerm("mammogram", "diagnosis", "imaging"),
+    TaxonomyTerm("colonoscopy cancer", "diagnosis", "scope"),
+    TaxonomyTerm("genetic testing cancer", "diagnosis", "genetic"),
+    TaxonomyTerm("BRCA testing", "diagnosis", "genetic"),
+    TaxonomyTerm("tumor profiling", "diagnosis", "molecular"),
+    TaxonomyTerm("next generation sequencing cancer", "diagnosis", "molecular"),
+    TaxonomyTerm("Foundation Medicine", "diagnosis", "molecular"),
+    TaxonomyTerm("Guardant Health", "diagnosis", "molecular"),
+    TaxonomyTerm("oncotype DX", "diagnosis", "molecular"),
+
+    # ============================================================================
+    # CAREGIVER & FAMILY
+    # ============================================================================
+
+    TaxonomyTerm("cancer caregiver", "caregiver", "general"),
+    TaxonomyTerm("caring for cancer patient", "caregiver", "general"),
+    TaxonomyTerm("caregiver burnout", "caregiver", "wellness"),
+    TaxonomyTerm("caregiver support", "caregiver", "support"),
+    TaxonomyTerm("cancer caregiver resources", "caregiver", "resources"),
+    TaxonomyTerm("how to help cancer patient", "caregiver", "support"),
+    TaxonomyTerm("cancer patient nutrition", "caregiver", "nutrition"),
+    TaxonomyTerm("cancer patient diet", "caregiver", "nutrition"),
+    TaxonomyTerm("talking to kids about cancer", "caregiver", "family"),
+    TaxonomyTerm("child with cancer parent support", "caregiver", "family"),
+    TaxonomyTerm("spouse has cancer", "caregiver", "family"),
+    TaxonomyTerm("parent has cancer", "caregiver", "family"),
+    TaxonomyTerm("end of life care cancer", "caregiver", "end_of_life"),
+    TaxonomyTerm("hospice cancer", "caregiver", "end_of_life"),
+    TaxonomyTerm("cancer grief", "caregiver", "grief"),
+    TaxonomyTerm("losing someone to cancer", "caregiver", "grief"),
+
+    # ============================================================================
+    # COSTS & INSURANCE
+    # ============================================================================
+
+    TaxonomyTerm("cancer treatment cost", "costs", "treatment"),
+    TaxonomyTerm("how much does chemo cost", "costs", "treatment"),
+    TaxonomyTerm("immunotherapy cost", "costs", "treatment"),
+    TaxonomyTerm("CAR-T therapy cost", "costs", "treatment"),
+    TaxonomyTerm("cancer insurance coverage", "costs", "insurance"),
+    TaxonomyTerm("cancer drug copay assistance", "costs", "assistance"),
+    TaxonomyTerm("patient assistance program cancer", "costs", "assistance"),
+    TaxonomyTerm("cancer financial toxicity", "costs", "financial"),
+    TaxonomyTerm("cancer bankruptcy", "costs", "financial"),
+    TaxonomyTerm("cancer disability", "costs", "disability"),
+    TaxonomyTerm("SSDI cancer", "costs", "disability"),
+    TaxonomyTerm("cancer and work", "costs", "employment"),
+    TaxonomyTerm("cancer medical leave", "costs", "employment"),
+
+    # ============================================================================
+    # PEDIATRIC SPECIFIC - EXPANDED
+    # ============================================================================
+
+    TaxonomyTerm("pediatric oncologist", "pediatric_oncology", "providers"),
+    TaxonomyTerm("children's hospital oncology", "pediatric_oncology", "providers"),
+    TaxonomyTerm("Ronald McDonald House", "pediatric_oncology", "support"),
+    TaxonomyTerm("Make-A-Wish cancer", "pediatric_oncology", "support"),
+    TaxonomyTerm("childhood cancer survivor", "pediatric_oncology", "survivorship"),
+    TaxonomyTerm("late effects childhood cancer", "pediatric_oncology", "survivorship"),
+    TaxonomyTerm("childhood cancer awareness", "pediatric_oncology", "awareness"),
+    TaxonomyTerm("gold ribbon", "pediatric_oncology", "awareness"),
+    TaxonomyTerm("September childhood cancer month", "pediatric_oncology", "awareness"),
+    TaxonomyTerm("St Baldricks", "pediatric_oncology", "fundraising"),
+    TaxonomyTerm("Alex's Lemonade Stand", "pediatric_oncology", "fundraising"),
+
+    # ============================================================================
+    # EMERGING THERAPIES
+    # ============================================================================
+
+    TaxonomyTerm("tumor treating fields", "emerging", "device"),
+    TaxonomyTerm("TTFields", "emerging", "device"),
+    TaxonomyTerm("Optune", "emerging", "device"),
+    TaxonomyTerm("oncolytic virus", "emerging", "virus"),
+    TaxonomyTerm("T-VEC", "emerging", "virus"),
+    TaxonomyTerm("bispecific antibody cancer", "emerging", "antibody"),
+    TaxonomyTerm("ADC cancer", "emerging", "antibody"),
+    TaxonomyTerm("antibody drug conjugate", "emerging", "antibody"),
+    TaxonomyTerm("Enhertu", "emerging", "antibody"),
+    TaxonomyTerm("Padcev", "emerging", "antibody"),
+    TaxonomyTerm("radioligand therapy", "emerging", "radiopharmaceutical"),
+    TaxonomyTerm("Pluvicto", "emerging", "radiopharmaceutical"),
+    TaxonomyTerm("Lutathera", "emerging", "radiopharmaceutical"),
+    TaxonomyTerm("tumor infiltrating lymphocytes", "emerging", "cell_therapy"),
+    TaxonomyTerm("TIL therapy", "emerging", "cell_therapy"),
+    TaxonomyTerm("Amtagvi", "emerging", "cell_therapy"),
+    TaxonomyTerm("cancer neoantigen vaccine", "emerging", "vaccine"),
+    TaxonomyTerm("personalized cancer vaccine", "emerging", "vaccine"),
+
+    # ============================================================================
+    # INTEGRATIVE & LIFESTYLE
+    # ============================================================================
+
+    TaxonomyTerm("integrative oncology", "integrative", "general"),
+    TaxonomyTerm("complementary cancer treatment", "integrative", "general"),
+    TaxonomyTerm("cancer and exercise", "integrative", "lifestyle"),
+    TaxonomyTerm("yoga cancer", "integrative", "mind_body"),
+    TaxonomyTerm("meditation cancer", "integrative", "mind_body"),
+    TaxonomyTerm("acupuncture cancer", "integrative", "alternative"),
+    TaxonomyTerm("cannabis cancer", "integrative", "cannabis"),
+    TaxonomyTerm("CBD cancer", "integrative", "cannabis"),
+    TaxonomyTerm("medical marijuana cancer", "integrative", "cannabis"),
+    TaxonomyTerm("cancer diet", "integrative", "nutrition"),
+    TaxonomyTerm("anti-cancer foods", "integrative", "nutrition"),
+    TaxonomyTerm("ketogenic diet cancer", "integrative", "nutrition"),
+    TaxonomyTerm("fasting and cancer", "integrative", "nutrition"),
+    TaxonomyTerm("supplements during chemo", "integrative", "supplements"),
+    TaxonomyTerm("vitamin D cancer", "integrative", "supplements"),
+    TaxonomyTerm("turmeric cancer", "integrative", "supplements"),
+
+    # ============================================================================
+    # PREVENTION & SCREENING
+    # ============================================================================
+
+    TaxonomyTerm("cancer prevention", "prevention", "general"),
+    TaxonomyTerm("cancer screening", "prevention", "screening"),
+    TaxonomyTerm("cancer screening guidelines", "prevention", "guidelines"),
+    TaxonomyTerm("HPV vaccine cancer", "prevention", "vaccine"),
+    TaxonomyTerm("hepatitis B vaccine cancer", "prevention", "vaccine"),
+    TaxonomyTerm("cancer risk factors", "prevention", "risk"),
+    TaxonomyTerm("hereditary cancer syndrome", "prevention", "genetic"),
+    TaxonomyTerm("Lynch syndrome screening", "prevention", "genetic"),
+    TaxonomyTerm("BRCA prophylactic mastectomy", "prevention", "prophylactic"),
+    TaxonomyTerm("preventive mastectomy", "prevention", "prophylactic"),
+    TaxonomyTerm("colon cancer prevention", "prevention", "specific"),
+    TaxonomyTerm("lung cancer screening", "prevention", "specific"),
+    TaxonomyTerm("skin cancer prevention", "prevention", "specific"),
 ]
 
 
@@ -461,6 +769,7 @@ CATEGORY_DISPLAY_NAMES = {
     "pediatric_oncology": "Pediatric Oncology",
     "adult_oncology": "Adult Oncology",
     "treatment": "Cancer Treatment",
+    "clinical_trials": "Clinical Trials",
     "rare_genetic": "Rare Genetic Diseases",
     "rare_neurological": "Rare Neurological Diseases",
     "rare_autoimmune": "Rare Autoimmune Diseases",
@@ -468,8 +777,15 @@ CATEGORY_DISPLAY_NAMES = {
     "rare_metabolic": "Rare Metabolic Diseases",
     "rare_immune": "Rare Immune Disorders",
     "rare_cancer": "Rare Cancers",
+    "symptoms": "Symptoms",
+    "diagnosis": "Diagnosis & Testing",
+    "caregiver": "Caregiver & Family",
     "support": "Support & Resources",
     "survivorship": "Survivorship",
+    "costs": "Costs & Insurance",
+    "emerging": "Emerging Therapies",
+    "integrative": "Integrative & Lifestyle",
+    "prevention": "Prevention & Screening",
 }
 
 
