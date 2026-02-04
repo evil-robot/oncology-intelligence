@@ -438,77 +438,124 @@ function FlyControls({ enabled }: { enabled: boolean }) {
   return null
 }
 
-// Auto-pilot drift mode - orbits around data center keeping everything in view
+// Dynamic fly-through tour - zooms through the data dramatically
 function AutoPilot({ enabled, terms }: { enabled: boolean; terms: Term[] }) {
   const { camera } = useThree()
-  const timeRef = useRef(0)
+  const progressRef = useRef(0)
+  const waypointsRef = useRef<THREE.Vector3[]>([])
   const centerRef = useRef(new THREE.Vector3(0, 0, 0))
-  const radiusRef = useRef(12)
 
-  // Calculate data center and appropriate orbit radius
+  // Generate exciting waypoints through the data
   useEffect(() => {
-    if (terms.length > 0) {
-      // Find the center of all data points
-      let sumX = 0, sumY = 0, sumZ = 0
-      let minX = Infinity, maxX = -Infinity
-      let minY = Infinity, maxY = -Infinity
-      let minZ = Infinity, maxZ = -Infinity
+    if (terms.length < 3) return
 
-      terms.forEach(t => {
-        sumX += t.x
-        sumY += t.y
-        sumZ += t.z
-        minX = Math.min(minX, t.x)
-        maxX = Math.max(maxX, t.x)
-        minY = Math.min(minY, t.y)
-        maxY = Math.max(maxY, t.y)
-        minZ = Math.min(minZ, t.z)
-        maxZ = Math.max(maxZ, t.z)
-      })
+    // Calculate center
+    const center = new THREE.Vector3()
+    terms.forEach(t => center.add(new THREE.Vector3(t.x, t.y, t.z)))
+    center.divideScalar(terms.length)
+    centerRef.current = center
 
-      centerRef.current = new THREE.Vector3(
-        sumX / terms.length,
-        sumY / terms.length,
-        sumZ / terms.length
+    // Pick diverse waypoints - spread across different areas
+    const waypoints: THREE.Vector3[] = []
+    const shuffled = [...terms].sort(() => Math.random() - 0.5)
+
+    // Start with a dramatic pullback view
+    waypoints.push(new THREE.Vector3(center.x, center.y + 3, center.z + 12))
+
+    // Dive into the data - pick 8-12 points to fly between
+    const numWaypoints = Math.min(12, Math.max(8, Math.floor(terms.length / 10)))
+    for (let i = 0; i < numWaypoints; i++) {
+      const term = shuffled[i]
+      // Position camera close to data point, slightly offset for drama
+      const offset = new THREE.Vector3(
+        (Math.random() - 0.5) * 1.5,
+        (Math.random() - 0.5) * 1.5 + 0.5,
+        Math.random() * 2 + 1 // Always slightly in front
       )
-
-      // Calculate radius to keep all data visible with padding
-      const rangeX = maxX - minX
-      const rangeY = maxY - minY
-      const rangeZ = maxZ - minZ
-      radiusRef.current = Math.max(rangeX, rangeY, rangeZ) * 0.7 + 8
+      waypoints.push(new THREE.Vector3(term.x + offset.x, term.y + offset.y, term.z + offset.z))
     }
+
+    // Add some dramatic sweeping moves through clusters
+    const extremes = {
+      minX: Math.min(...terms.map(t => t.x)),
+      maxX: Math.max(...terms.map(t => t.x)),
+      minY: Math.min(...terms.map(t => t.y)),
+      maxY: Math.max(...terms.map(t => t.y)),
+      minZ: Math.min(...terms.map(t => t.z)),
+      maxZ: Math.max(...terms.map(t => t.z)),
+    }
+
+    // Sweeping corner-to-corner moves
+    waypoints.push(new THREE.Vector3(extremes.minX - 1, center.y + 2, extremes.maxZ + 3))
+    waypoints.push(new THREE.Vector3(extremes.maxX + 1, extremes.maxY + 1, center.z))
+    waypoints.push(new THREE.Vector3(center.x, extremes.minY - 1, extremes.minZ - 2))
+
+    // End with a pullback reveal
+    waypoints.push(new THREE.Vector3(center.x + 5, center.y + 5, center.z + 15))
+
+    waypointsRef.current = waypoints
+    progressRef.current = 0
   }, [terms])
 
   useFrame((_, delta) => {
-    if (!enabled || terms.length === 0) return
+    if (!enabled || waypointsRef.current.length < 4) return
 
-    timeRef.current += delta * 0.12 // Gentle tour speed
+    const waypoints = waypointsRef.current
+    const speed = 0.08 // Adjust for faster/slower tour
+    progressRef.current += delta * speed
 
-    const center = centerRef.current
-    const radius = radiusRef.current
-    const t = timeRef.current
+    // Loop through waypoints
+    const totalSegments = waypoints.length
+    const t = progressRef.current % totalSegments
+    const segmentIndex = Math.floor(t)
+    const segmentProgress = t - segmentIndex
 
-    // Create a smooth orbital path - figure-8 with tilt for variety
-    const angle1 = t * 0.25
-    const angle2 = t * 0.15
-    const verticalOffset = Math.sin(angle2) * radius * 0.3
+    // Get 4 points for Catmull-Rom interpolation (smooth curves)
+    const p0 = waypoints[(segmentIndex - 1 + totalSegments) % totalSegments]
+    const p1 = waypoints[segmentIndex % totalSegments]
+    const p2 = waypoints[(segmentIndex + 1) % totalSegments]
+    const p3 = waypoints[(segmentIndex + 2) % totalSegments]
+
+    // Catmull-Rom spline for buttery smooth movement
+    const f = segmentProgress
+    const f2 = f * f
+    const f3 = f2 * f
 
     const targetPos = new THREE.Vector3(
-      center.x + Math.sin(angle1) * radius,
-      center.y + verticalOffset + 2, // Keep slightly above center
-      center.z + Math.cos(angle1) * radius
+      0.5 * (2 * p1.x + (-p0.x + p2.x) * f + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * f2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * f3),
+      0.5 * (2 * p1.y + (-p0.y + p2.y) * f + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * f2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * f3),
+      0.5 * (2 * p1.z + (-p0.z + p2.z) * f + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * f2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * f3)
     )
 
-    // Smoothly move camera
-    camera.position.lerp(targetPos, 0.015)
+    // Smooth camera movement
+    camera.position.lerp(targetPos, 0.06)
 
-    // Always look at the data center
+    // Look ahead in the direction of travel for cinematic feel
+    const lookAheadT = (t + 0.3) % totalSegments
+    const lookSegment = Math.floor(lookAheadT)
+    const lookProgress = lookAheadT - lookSegment
+
+    const lp0 = waypoints[(lookSegment - 1 + totalSegments) % totalSegments]
+    const lp1 = waypoints[lookSegment % totalSegments]
+    const lp2 = waypoints[(lookSegment + 1) % totalSegments]
+    const lp3 = waypoints[(lookSegment + 2) % totalSegments]
+
+    const lf = lookProgress
+    const lf2 = lf * lf
+    const lf3 = lf2 * lf
+
+    const lookTarget = new THREE.Vector3(
+      0.5 * (2 * lp1.x + (-lp0.x + lp2.x) * lf + (2 * lp0.x - 5 * lp1.x + 4 * lp2.x - lp3.x) * lf2 + (-lp0.x + 3 * lp1.x - 3 * lp2.x + lp3.x) * lf3),
+      0.5 * (2 * lp1.y + (-lp0.y + lp2.y) * lf + (2 * lp0.y - 5 * lp1.y + 4 * lp2.y - lp3.y) * lf2 + (-lp0.y + 3 * lp1.y - 3 * lp2.y + lp3.y) * lf3),
+      0.5 * (2 * lp1.z + (-lp0.z + lp2.z) * lf + (2 * lp0.z - 5 * lp1.z + 4 * lp2.z - lp3.z) * lf2 + (-lp0.z + 3 * lp1.z - 3 * lp2.z + lp3.z) * lf3)
+    )
+
+    // Smooth rotation towards look target
     const targetQuat = new THREE.Quaternion()
     const lookMatrix = new THREE.Matrix4()
-    lookMatrix.lookAt(camera.position, center, new THREE.Vector3(0, 1, 0))
+    lookMatrix.lookAt(camera.position, lookTarget, new THREE.Vector3(0, 1, 0))
     targetQuat.setFromRotationMatrix(lookMatrix)
-    camera.quaternion.slerp(targetQuat, 0.025)
+    camera.quaternion.slerp(targetQuat, 0.04)
   })
 
   return null
