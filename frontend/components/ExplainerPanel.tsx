@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { HelpCircle, X, Layers, TrendingUp, MapPin, Sparkles, MousePointer, Search, Eye, RotateCcw, ChevronRight, Lightbulb } from 'lucide-react'
 import Tooltip from './Tooltip'
 
@@ -80,6 +81,10 @@ export default function ExplainerPanel() {
   const [isOpen, setIsOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<number | null>(null)
   const [hasSeenGuide, setHasSeenGuide] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  // Need to wait for client mount before using createPortal
+  useEffect(() => { setMounted(true) }, [])
 
   // Check if user has seen the guide before
   useEffect(() => {
@@ -122,8 +127,8 @@ export default function ExplainerPanel() {
         </button>
       </Tooltip>
 
-      {/* Modal Overlay */}
-      {isOpen && (
+      {/* Modal Overlay - portaled to body to sit above Three.js canvas */}
+      {isOpen && mounted && createPortal(
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
@@ -239,7 +244,8 @@ export default function ExplainerPanel() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

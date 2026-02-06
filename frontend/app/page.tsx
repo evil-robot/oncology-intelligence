@@ -126,8 +126,8 @@ export default function HomePage() {
         {/* Right Sidebar - Detail Panel, Pipeline & Data Sources */}
         <aside className="w-96 flex-shrink-0 border-l border-border p-4 overflow-y-auto space-y-4">
           <DetailPanel />
-          <PipelinePanel />
           <DataSourcesPanel />
+          <PipelinePanel />
         </aside>
       </main>
 
