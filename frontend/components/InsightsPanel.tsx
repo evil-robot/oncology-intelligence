@@ -188,7 +188,7 @@ export default function InsightsPanel() {
       {demoMode && !isLoading && (
         <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
           <p className="text-xs text-yellow-400">
-            Showing sample data. Run the pipeline to get real insights from Google Trends.
+            Showing sample data. Run the pipeline to get real insights from search trends and evidence sources.
           </p>
         </div>
       )}

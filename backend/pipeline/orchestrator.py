@@ -3,11 +3,12 @@ Pipeline orchestrator - coordinates all pipeline components.
 
 Runs the full data pipeline:
 1. Load/expand taxonomy
-2. Fetch Google Trends data
-3. Generate embeddings
-4. Cluster terms
-5. Load SDOH data
-6. Persist everything to database
+2. Generate embeddings
+3. Cluster terms
+4. Fetch search trends + related queries/topics via SerpAPI
+5. Expand taxonomy from discovered related queries
+6. Load SDOH data
+7. Persist everything to database
 """
 
 import logging
@@ -17,14 +18,25 @@ from typing import Optional
 import numpy as np
 from sqlalchemy.orm import Session
 
-from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun
+from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery
 from pipeline.taxonomy import get_seed_terms, TaxonomyTerm
-from pipeline.trends_fetcher import TrendsFetcher, transform_interest_over_time, transform_interest_by_region
+from pipeline.trends_fetcher import (
+    TrendsFetcher,
+    transform_interest_over_time,
+    transform_interest_by_region,
+    transform_related_queries,
+    transform_related_topics,
+)
 from pipeline.embeddings import EmbeddingGenerator, compute_centroid
 from pipeline.clustering import ClusteringPipeline, get_cluster_color, generate_cluster_name
 from pipeline.sdoh_loader import SDOHLoader, STATE_CENTROIDS
 
 logger = logging.getLogger(__name__)
+
+# Minimum "rising" value to consider a related query worth promoting to taxonomy
+PROMOTION_THRESHOLD = 200  # 200% growth or "Breakout"
+# Maximum number of new terms to discover per pipeline run
+MAX_DISCOVERED_TERMS = 50
 
 
 class PipelineOrchestrator:
@@ -47,7 +59,7 @@ class PipelineOrchestrator:
         Run the complete data pipeline.
 
         Args:
-            fetch_trends: Whether to fetch fresh Google Trends data
+            fetch_trends: Whether to fetch fresh search trend data via SerpAPI
             timeframe: Time range for trends
             geo: Geographic region for trends
 
@@ -76,13 +88,23 @@ class PipelineOrchestrator:
             logger.info("Step 3: Clustering terms...")
             await self._cluster_terms()
 
-            # Step 4: Fetch trends (if enabled)
+            # Step 4: Fetch trends + related data (if enabled)
             if fetch_trends:
-                logger.info("Step 4: Fetching Google Trends...")
+                logger.info("Step 4: Fetching search trends via SerpAPI...")
                 await self._fetch_trends(timeframe, geo)
 
-            # Step 5: Load SDOH data
-            logger.info("Step 5: Loading SDOH data...")
+                # Step 5: Expand taxonomy from discovered related queries
+                logger.info("Step 5: Expanding taxonomy from discoveries...")
+                new_terms = await self._expand_taxonomy_from_related()
+                if new_terms:
+                    # Embed and cluster the new terms
+                    logger.info(f"Step 5b: Embedding {len(new_terms)} discovered terms...")
+                    await self._generate_embeddings(new_terms)
+                    logger.info("Step 5c: Re-clustering with discovered terms...")
+                    await self._cluster_terms()
+
+            # Step 6: Load SDOH data
+            logger.info("Step 6: Loading SDOH data...")
             await self._load_sdoh_data()
 
             # Complete
@@ -214,14 +236,34 @@ class PipelineOrchestrator:
         self.db.commit()
 
     async def _fetch_trends(self, timeframe: str, geo: str) -> None:
-        """Fetch Google Trends data for all terms."""
-        terms = self.db.query(SearchTerm).all()
+        """
+        Fetch search trend data for all terms via SerpAPI.
 
-        for term in terms:
+        For each term, fetches:
+        - Interest over time (5-year timeseries)
+        - Interest by region (all US states)
+        - Related queries (rising + top)
+        - Related topics (rising + top)
+        """
+        terms = self.db.query(SearchTerm).all()
+        total = len(terms)
+
+        # Clear old trend data to avoid duplicates on re-run
+        logger.info("Clearing old trend data before refresh...")
+        self.db.query(TrendData).delete()
+        self.db.query(RelatedQuery).delete()
+        self.db.commit()
+
+        for i, term in enumerate(terms):
+            logger.info(f"Fetching trends {i + 1}/{total}: {term.term}")
+
             result = self.trends_fetcher.fetch_term(
                 term.term,
                 timeframe=timeframe,
                 geo=geo,
+                include_regions=True,
+                include_related=True,
+                include_topics=True,
             )
 
             # Store interest over time
@@ -238,14 +280,16 @@ class PipelineOrchestrator:
             # Store interest by region
             for record in transform_interest_by_region(result):
                 # Find or create region
+                geo_code_full = f"US-{record['geo_code']}" if not record['geo_code'].startswith('US-') else record['geo_code']
                 region = self.db.query(GeographicRegion).filter(
-                    GeographicRegion.geo_code == f"US-{record['geo_code']}"
+                    GeographicRegion.geo_code == geo_code_full
                 ).first()
 
                 if not region:
-                    centroid = STATE_CENTROIDS.get(record["geo_code"], (0, 0))
+                    state_abbr = geo_code_full.replace("US-", "")
+                    centroid = STATE_CENTROIDS.get(state_abbr, (0, 0))
                     region = GeographicRegion(
-                        geo_code=f"US-{record['geo_code']}",
+                        geo_code=geo_code_full,
                         name=record["geo_name"],
                         level="state",
                         latitude=centroid[0],
@@ -264,7 +308,116 @@ class PipelineOrchestrator:
                 )
                 self.db.add(trend)
 
+            # Store related queries
+            for record in transform_related_queries(result):
+                if not record["query"]:
+                    continue
+                rq = RelatedQuery(
+                    source_term_id=term.id,
+                    query=record["query"],
+                    query_type=record["query_type"],
+                    topic_type=record.get("topic_type"),
+                    value=record["value"],
+                    extracted_value=record["extracted_value"],
+                )
+                self.db.add(rq)
+
+            # Store related topics
+            for record in transform_related_topics(result):
+                if not record["query"]:
+                    continue
+                rt = RelatedQuery(
+                    source_term_id=term.id,
+                    query=record["query"],
+                    query_type=record["query_type"],
+                    topic_type=record.get("topic_type"),
+                    value=record["value"],
+                    extracted_value=record["extracted_value"],
+                )
+                self.db.add(rt)
+
+            # Commit every 10 terms to avoid large transaction
+            if (i + 1) % 10 == 0:
+                self.db.commit()
+                logger.info(f"Committed batch {i + 1}/{total}")
+
         self.db.commit()
+        logger.info(f"Fetched trends for {total} terms")
+
+    async def _expand_taxonomy_from_related(self) -> list[SearchTerm]:
+        """
+        Discover new search terms from related queries found during trend fetching.
+
+        Promotes high-value rising queries (≥200% growth or "Breakout") that aren't
+        already in the taxonomy. This automatically expands coverage into emerging
+        areas of search interest.
+
+        Returns:
+            List of newly created SearchTerm objects
+        """
+        # Get all rising queries/topics with high growth
+        rising_queries = self.db.query(RelatedQuery).filter(
+            RelatedQuery.query_type.in_(["rising_query", "rising_topic"]),
+            RelatedQuery.is_promoted == False,
+            RelatedQuery.extracted_value >= PROMOTION_THRESHOLD,
+        ).order_by(RelatedQuery.extracted_value.desc()).all()
+
+        if not rising_queries:
+            logger.info("No high-growth related queries to promote")
+            return []
+
+        # Get existing term names for deduplication
+        existing_terms = set(
+            t[0].lower() for t in self.db.query(SearchTerm.term).all()
+        )
+
+        new_terms = []
+        promoted_count = 0
+
+        for rq in rising_queries:
+            if promoted_count >= MAX_DISCOVERED_TERMS:
+                break
+
+            normalized = rq.query.lower().strip()
+            if normalized in existing_terms or len(normalized) < 3:
+                continue
+
+            # Get the source term's category to inherit
+            source_term = self.db.query(SearchTerm).filter(
+                SearchTerm.id == rq.source_term_id
+            ).first()
+            if not source_term:
+                continue
+
+            # Create new term
+            new_term = SearchTerm(
+                term=rq.query,
+                normalized_term=normalized,
+                category=source_term.category,
+                subcategory=f"discovered:{rq.query_type}",
+                parent_term_id=source_term.id,
+            )
+            self.db.add(new_term)
+            existing_terms.add(normalized)
+
+            # Mark as promoted
+            rq.is_promoted = True
+
+            new_terms.append(new_term)
+            promoted_count += 1
+
+        if new_terms:
+            self.db.commit()
+            # Update promoted_term_id references
+            for new_term, rq in zip(new_terms, [r for r in rising_queries if r.is_promoted]):
+                rq.promoted_term_id = new_term.id
+            self.db.commit()
+
+            logger.info(f"Discovered and promoted {len(new_terms)} new terms from related queries")
+        else:
+            logger.info("No new unique terms to promote from related queries")
+
+        return new_terms
 
     async def _load_sdoh_data(self) -> None:
         """Load SDOH data and update geographic regions."""

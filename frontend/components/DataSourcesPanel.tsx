@@ -13,7 +13,9 @@ import {
   ChevronRight,
   CheckCircle,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  GraduationCap,
+  ScrollText,
 } from 'lucide-react'
 import { useSelection } from '@/lib/store'
 
@@ -35,35 +37,24 @@ interface SourcesResponse {
 
 interface TriangulationData {
   term: string
-  clinical_trials: {
-    count: number
-    items: any[]
-    recruiting: number
-  }
-  publications: {
-    count: number
-    items: any[]
-  }
-  fda_data: {
-    count: number
-    items: any[]
-  }
-  news: {
-    count: number
-    items: any[]
-  }
-  summary: {
-    total_sources: number
-    evidence_strength: string
-  }
+  clinical_trials: { count: number; items: any[]; recruiting: number }
+  publications: { count: number; items: any[] }
+  fda_data: { count: number; items: any[] }
+  news: { count: number; items: any[] }
+  scholar: { count: number; items: any[]; top_cited: number }
+  patents: { count: number; items: any[] }
+  summary: { total_sources: number; evidence_strength: string }
 }
 
 const sourceIcons: Record<string, any> = {
   google_trends: TrendingUp,
   clinical_trials: FlaskConical,
   pubmed: FileText,
+  google_scholar: GraduationCap,
   openfda: Pill,
   cdc_svi: MapPin,
+  google_news: Newspaper,
+  google_patents: ScrollText,
   news: Newspaper,
 }
 
@@ -74,10 +65,76 @@ const strengthColors: Record<string, string> = {
   limited: 'text-gray-400 bg-gray-400/20',
 }
 
+// Configuration for rendering each evidence section dynamically
+const evidenceSections = [
+  {
+    key: 'clinical_trials',
+    label: 'Clinical Trials',
+    icon: FlaskConical,
+    color: 'text-purple-400',
+    source: 'ClinicalTrials.gov',
+    getSubtext: (data: any) =>
+      data.recruiting > 0 ? `${data.recruiting} recruiting` : null,
+    getItemTitle: (item: any) => item.title,
+    getItemUrl: (item: any) => item.url,
+  },
+  {
+    key: 'scholar',
+    label: 'Academic Research',
+    icon: GraduationCap,
+    color: 'text-emerald-400',
+    source: 'Google Scholar via SerpAPI',
+    getSubtext: (data: any) =>
+      data.top_cited > 0 ? `Top cited: ${data.top_cited}` : null,
+    getItemTitle: (item: any) => item.title,
+    getItemUrl: (item: any) => item.url,
+  },
+  {
+    key: 'publications',
+    label: 'PubMed Publications',
+    icon: FileText,
+    color: 'text-blue-400',
+    source: 'PubMed/NCBI',
+    getSubtext: () => null,
+    getItemTitle: (item: any) => item.title,
+    getItemUrl: (item: any) => item.url,
+  },
+  {
+    key: 'fda_data',
+    label: 'FDA Data',
+    icon: Pill,
+    color: 'text-green-400',
+    source: 'FDA openFDA',
+    getSubtext: () => null,
+    getItemTitle: (item: any) => item.drug_name || item.title,
+    getItemUrl: () => null,
+  },
+  {
+    key: 'news',
+    label: 'News Coverage',
+    icon: Newspaper,
+    color: 'text-yellow-400',
+    source: 'Google News via SerpAPI',
+    getSubtext: () => null,
+    getItemTitle: (item: any) => item.title,
+    getItemUrl: (item: any) => item.url,
+  },
+  {
+    key: 'patents',
+    label: 'Patent Filings',
+    icon: ScrollText,
+    color: 'text-orange-400',
+    source: 'Google Patents via SerpAPI',
+    getSubtext: () => null,
+    getItemTitle: (item: any) => item.title,
+    getItemUrl: (item: any) => item.url,
+  },
+]
+
 export default function DataSourcesPanel() {
   const selection = useSelection()
   const [coreData, setCoreData] = useState<DataSource[]>([])
-  const [evidenceSources, setEvidenceSources] = useState<DataSource[]>([])
+  const [evidenceSrcs, setEvidenceSrcs] = useState<DataSource[]>([])
   const [triangulation, setTriangulation] = useState<TriangulationData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'sources' | 'evidence'>('sources')
@@ -93,7 +150,7 @@ export default function DataSourcesPanel() {
         if (response.ok) {
           const data: SourcesResponse = await response.json()
           setCoreData(data.core_data || [])
-          setEvidenceSources(data.evidence_sources || [])
+          setEvidenceSrcs(data.evidence_sources || [])
         }
       } catch (error) {
         console.error('Failed to fetch sources:', error)
@@ -134,6 +191,9 @@ export default function DataSourcesPanel() {
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">
           <Database className="w-4 h-4 text-cyan-400" />
           Data Sources
+          <span className="text-[10px] text-gray-500 bg-cyan-400/10 px-1.5 py-0.5 rounded">
+            {1 + evidenceSrcs.length} sources
+          </span>
         </h3>
       </div>
 
@@ -210,7 +270,7 @@ export default function DataSourcesPanel() {
               <span className="text-[10px] text-gray-500 bg-cyan-400/10 px-2 py-0.5 rounded">Queried On-Demand</span>
             </div>
             <div className="space-y-2">
-              {evidenceSources.map((source) => {
+              {evidenceSrcs.map((source) => {
                 const Icon = sourceIcons[source.id] || Database
                 return (
                   <div
@@ -244,7 +304,7 @@ export default function DataSourcesPanel() {
         </div>
       )}
 
-      {/* Evidence Tab */}
+      {/* Evidence Tab — rendered dynamically from config */}
       {activeTab === 'evidence' && (
         <div className="space-y-3">
           {!selectedTerm ? (
@@ -258,7 +318,7 @@ export default function DataSourcesPanel() {
           ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="w-6 h-6 animate-spin text-primary" />
-              <span className="ml-2 text-gray-400">Fetching from sources...</span>
+              <span className="ml-2 text-gray-400">Fetching from {evidenceSections.length} sources...</span>
             </div>
           ) : triangulation ? (
             <>
@@ -272,112 +332,66 @@ export default function DataSourcesPanel() {
                 </span>
               </div>
 
-              {/* Clinical Trials */}
-              <div className="bg-surface/50 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <FlaskConical className="w-4 h-4 text-purple-400" />
-                    <span className="text-sm text-white">Clinical Trials</span>
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {triangulation.clinical_trials.count} found
-                    {triangulation.clinical_trials.recruiting > 0 && (
-                      <span className="ml-1 text-green-400">
-                        ({triangulation.clinical_trials.recruiting} recruiting)
+              {/* Source count summary */}
+              <div className="bg-surface/50 rounded-lg p-2 text-center">
+                <span className="text-xs text-gray-400">
+                  Found data in <span className="text-cyan-400 font-medium">{triangulation.summary.total_sources}</span> of {evidenceSections.length} sources
+                </span>
+              </div>
+
+              {/* Dynamically render each evidence section */}
+              {evidenceSections.map((section) => {
+                const sectionData = (triangulation as any)[section.key]
+                if (!sectionData || sectionData.count === 0) return null
+
+                const Icon = section.icon
+                const subtext = section.getSubtext(sectionData)
+
+                return (
+                  <div key={section.key} className="bg-surface/50 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Icon className={`w-4 h-4 ${section.color}`} />
+                        <span className="text-sm text-white">{section.label}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {sectionData.count} found
+                        {subtext && (
+                          <span className="ml-1 text-green-400">({subtext})</span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                </div>
-                {triangulation.clinical_trials.items.slice(0, 2).map((trial: any, i: number) => (
-                  <a
-                    key={i}
-                    href={trial.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xs text-gray-400 hover:text-cyan-400 truncate mb-1"
-                  >
-                    <ChevronRight className="w-3 h-3 inline mr-1" />
-                    {trial.title}
-                  </a>
-                ))}
-                <p className="text-[10px] text-gray-600 mt-1">
-                  Source: ClinicalTrials.gov
-                </p>
-              </div>
-
-              {/* Publications */}
-              <div className="bg-surface/50 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-blue-400" />
-                    <span className="text-sm text-white">Publications</span>
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {triangulation.publications.count} found
-                  </span>
-                </div>
-                {triangulation.publications.items.slice(0, 2).map((article: any, i: number) => (
-                  <a
-                    key={i}
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xs text-gray-400 hover:text-cyan-400 truncate mb-1"
-                  >
-                    <ChevronRight className="w-3 h-3 inline mr-1" />
-                    {article.title}
-                  </a>
-                ))}
-                <p className="text-[10px] text-gray-600 mt-1">
-                  Source: PubMed/NCBI
-                </p>
-              </div>
-
-              {/* FDA Data */}
-              {triangulation.fda_data.count > 0 && (
-                <div className="bg-surface/50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Pill className="w-4 h-4 text-green-400" />
-                      <span className="text-sm text-white">FDA Data</span>
                     </div>
-                    <span className="text-xs text-gray-400">
-                      {triangulation.fda_data.count} records
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-600">
-                    Source: FDA openFDA
-                  </p>
-                </div>
-              )}
+                    {sectionData.items.slice(0, 2).map((item: any, i: number) => {
+                      const title = section.getItemTitle(item)
+                      const url = section.getItemUrl(item)
 
-              {/* News */}
-              <div className="bg-surface/50 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Newspaper className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm text-white">News Coverage</span>
+                      return url ? (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-xs text-gray-400 hover:text-cyan-400 truncate mb-1"
+                        >
+                          <ChevronRight className="w-3 h-3 inline mr-1" />
+                          {title}
+                          {section.key === 'scholar' && item.cited_by > 0 && (
+                            <span className="ml-1 text-emerald-400/70">({item.cited_by} cited)</span>
+                          )}
+                        </a>
+                      ) : (
+                        <div key={i} className="text-xs text-gray-400 truncate mb-1">
+                          <ChevronRight className="w-3 h-3 inline mr-1" />
+                          {title}
+                        </div>
+                      )
+                    })}
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      Source: {section.source}
+                    </p>
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {triangulation.news.count} articles
-                  </span>
-                </div>
-                {triangulation.news.items.slice(0, 2).map((news: any, i: number) => (
-                  <a
-                    key={i}
-                    href={news.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xs text-gray-400 hover:text-cyan-400 truncate mb-1"
-                  >
-                    <ChevronRight className="w-3 h-3 inline mr-1" />
-                    {news.title}
-                  </a>
-                ))}
-                <p className="text-[10px] text-gray-600 mt-1">
-                  Source: Google News
-                </p>
-              </div>
+                )
+              })}
             </>
           ) : (
             <div className="text-center py-6">

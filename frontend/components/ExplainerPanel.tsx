@@ -37,11 +37,11 @@ const sections: Section[] = [
   },
   {
     icon: TrendingUp,
-    title: 'Google Trends Data',
-    description: 'Each term has associated search interest data from Google Trends. Values range from 0-100 (relative interest). This shows what people are actively searching for over time.',
+    title: 'Multi-Source Intelligence',
+    description: 'Each term is enriched with data from 8 sources: search trends (SerpAPI), Google Scholar, Google Patents, Google News, ClinicalTrials.gov, PubMed, FDA, and CDC. This shows what people search for, what researchers publish, and where innovation is heading.',
     tips: [
-      'Select a term to see its trend chart',
-      'Compare trends across regions',
+      'Select a term to see its trend chart and evidence',
+      'View academic papers, patents, and news for any term',
       'Look for spikes indicating emerging interest',
     ],
     color: 'from-green-500 to-emerald-500',
@@ -59,12 +59,12 @@ const sections: Section[] = [
   },
   {
     icon: Sparkles,
-    title: 'AI-Powered Insights',
-    description: 'Machine learning identifies anomalies: sudden spikes, emerging topics, regional outliers, and unusual patterns. The Insights panel surfaces these automatically.',
+    title: 'AI-Powered Discovery & Insights',
+    description: 'The pipeline automatically discovers new search terms from related queries and topics. Rising queries (200%+ growth) get promoted into the taxonomy. Machine learning also identifies anomalies: sudden spikes, emerging topics, regional outliers, and unusual patterns.',
     tips: [
-      'Check the Insights panel for alerts',
+      'Discovered terms appear with a "discovered:" tag',
+      'Check the Insights panel for anomaly alerts',
       'Filter insights by severity (High/Medium/Low)',
-      'Click insights to navigate to relevant data',
     ],
     color: 'from-yellow-500 to-orange-500',
   },
@@ -228,7 +228,7 @@ export default function ExplainerPanel() {
             <div className="flex-shrink-0 p-4 border-t border-white/10 bg-black/20">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  <strong>Data:</strong> Google Trends • CDC SVI • OpenAI Embeddings
+                  <strong>Data:</strong> SerpAPI • Google Scholar • Patents • News • ClinicalTrials.gov • PubMed • FDA • CDC SVI
                 </p>
                 <button
                   onClick={handleClose}

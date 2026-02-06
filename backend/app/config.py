@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # OpenAI (optional - needed for embeddings)
     openai_api_key: str = ""
 
+    # SerpAPI (for Google Trends data)
+    serpapi_key: str = ""
+
     # Azure Storage (optional)
     azure_storage_connection_string: str = ""
     azure_storage_container: str = "pediatric-oncology-data"

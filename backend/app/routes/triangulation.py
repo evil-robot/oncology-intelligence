@@ -22,7 +22,9 @@ async def get_term_triangulation(
     - ClinicalTrials.gov (active clinical trials)
     - FDA openFDA (drug approvals, safety data)
     - PubMed (research publications)
-    - News (media coverage)
+    - Google Scholar via SerpAPI (academic papers with citations)
+    - Google News via SerpAPI (structured news coverage)
+    - Google Patents via SerpAPI (patent filings / innovation pipeline)
     """
     from pipeline.external_data import get_term_triangulation as fetch_triangulation
 
@@ -133,10 +135,10 @@ async def search_news(
     query: str = Query(..., description="Search term"),
     max_results: int = Query(10, le=20),
 ):
-    """Search health news."""
-    from pipeline.external_data import NewsClient
+    """Search Google News via SerpAPI."""
+    from pipeline.external_data import GoogleNewsClient
 
-    client = NewsClient()
+    client = GoogleNewsClient()
     try:
         articles = await client.search_health_news(query, max_results=max_results)
         return {
@@ -150,6 +152,50 @@ async def search_news(
         await client.close()
 
 
+@router.get("/scholar")
+async def search_scholar(
+    query: str = Query(..., description="Search term"),
+    max_results: int = Query(10, le=20),
+):
+    """Search Google Scholar via SerpAPI."""
+    from pipeline.external_data import GoogleScholarClient
+
+    client = GoogleScholarClient()
+    try:
+        articles = await client.search(query, max_results=max_results)
+        return {
+            "query": query,
+            "count": len(articles),
+            "articles": [a.to_dict() for a in articles],
+            "source": "Google Scholar",
+            "source_url": "https://scholar.google.com",
+        }
+    finally:
+        await client.close()
+
+
+@router.get("/patents")
+async def search_patents(
+    query: str = Query(..., description="Search term"),
+    max_results: int = Query(10, le=20),
+):
+    """Search Google Patents via SerpAPI."""
+    from pipeline.external_data import GooglePatentsClient
+
+    client = GooglePatentsClient()
+    try:
+        patents = await client.search(query, max_results=max_results)
+        return {
+            "query": query,
+            "count": len(patents),
+            "patents": [p.to_dict() for p in patents],
+            "source": "Google Patents",
+            "source_url": "https://patents.google.com",
+        }
+    finally:
+        await client.close()
+
+
 @router.get("/sources")
 async def list_data_sources():
     """List all available data sources and their status."""
@@ -158,7 +204,7 @@ async def list_data_sources():
             {
                 "id": "google_trends",
                 "name": "Google Trends",
-                "description": "Search interest data powering the visualization - collected and stored in our database",
+                "description": "Search interest data powering the visualization — collected via SerpAPI and stored in our database",
                 "url": "https://trends.google.com",
                 "data_type": "time_series",
                 "update_frequency": "configurable",
@@ -170,7 +216,7 @@ async def list_data_sources():
             {
                 "id": "clinical_trials",
                 "name": "ClinicalTrials.gov",
-                "description": "Registry of clinical studies - queried on-demand for evidence triangulation",
+                "description": "Registry of clinical studies — queried on-demand for evidence triangulation",
                 "url": "https://clinicaltrials.gov",
                 "data_type": "trials",
                 "update_frequency": "real-time API",
@@ -180,7 +226,7 @@ async def list_data_sources():
             {
                 "id": "pubmed",
                 "name": "PubMed",
-                "description": "Biomedical literature - queried on-demand for research context",
+                "description": "Biomedical literature — queried on-demand for research context",
                 "url": "https://pubmed.ncbi.nlm.nih.gov",
                 "data_type": "publications",
                 "update_frequency": "real-time API",
@@ -188,13 +234,43 @@ async def list_data_sources():
                 "stored": False,
             },
             {
+                "id": "google_scholar",
+                "name": "Google Scholar",
+                "description": "Academic research with citation counts — identifies high-impact papers via SerpAPI",
+                "url": "https://scholar.google.com",
+                "data_type": "publications",
+                "update_frequency": "real-time via SerpAPI",
+                "coverage": "Global academic literature",
+                "stored": False,
+            },
+            {
                 "id": "openfda",
                 "name": "FDA openFDA",
-                "description": "Drug approvals and safety data - queried on-demand",
+                "description": "Drug approvals and safety data — queried on-demand",
                 "url": "https://open.fda.gov",
                 "data_type": "regulatory",
                 "update_frequency": "real-time API",
                 "coverage": "US FDA regulated products",
+                "stored": False,
+            },
+            {
+                "id": "google_news",
+                "name": "Google News",
+                "description": "Structured news coverage — queried via SerpAPI for media context",
+                "url": "https://news.google.com",
+                "data_type": "news",
+                "update_frequency": "real-time via SerpAPI",
+                "coverage": "Global",
+                "stored": False,
+            },
+            {
+                "id": "google_patents",
+                "name": "Google Patents",
+                "description": "Patent filings — tracks innovation pipeline and upcoming treatments via SerpAPI",
+                "url": "https://patents.google.com",
+                "data_type": "patents",
+                "update_frequency": "real-time via SerpAPI",
+                "coverage": "100+ patent offices worldwide",
                 "stored": False,
             },
             {
@@ -205,16 +281,6 @@ async def list_data_sources():
                 "data_type": "demographics",
                 "update_frequency": "annual",
                 "coverage": "US counties and states",
-                "stored": False,
-            },
-            {
-                "id": "news",
-                "name": "Health News",
-                "description": "Recent news coverage - queried on-demand for media context",
-                "url": "https://news.google.com",
-                "data_type": "news",
-                "update_frequency": "real-time API",
-                "coverage": "Global",
                 "stored": False,
             },
         ]

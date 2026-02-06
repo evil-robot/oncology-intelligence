@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Play, RefreshCw, CheckCircle, XCircle, Clock, Database, TrendingUp, MapPin, Loader2 } from 'lucide-react'
+import { Play, RefreshCw, CheckCircle, XCircle, Clock, Database, TrendingUp, MapPin, Loader2, Sparkles } from 'lucide-react'
 
 interface PipelineStats {
   terms: number
@@ -10,6 +10,8 @@ interface PipelineStats {
   trend_data_points: number
   geographic_regions: number
   regions_with_sdoh: number
+  related_queries: number
+  discovered_terms: number
 }
 
 interface PipelineRun {
@@ -21,7 +23,9 @@ interface PipelineRun {
   errors: string[]
 }
 
-const ESTIMATED_TIME_PER_TERM = 8 // seconds per term (includes rate limiting)
+// 4 API calls per term: timeseries + regions + related queries + related topics
+// ~0.5s per call + overhead = ~3s per term
+const ESTIMATED_TIME_PER_TERM = 3
 
 export default function PipelinePanel() {
   const [stats, setStats] = useState<PipelineStats | null>(null)
@@ -88,12 +92,16 @@ export default function PipelinePanel() {
       setProgress(estimatedProgress)
 
       // Update status message based on progress
-      if (estimatedProgress < 20) {
+      if (estimatedProgress < 10) {
         setStatusMessage('Loading taxonomy and generating embeddings...')
-      } else if (estimatedProgress < 40) {
+      } else if (estimatedProgress < 20) {
         setStatusMessage('Clustering search terms...')
+      } else if (estimatedProgress < 75) {
+        setStatusMessage('Fetching trends, related queries & topics via SerpAPI...')
+      } else if (estimatedProgress < 85) {
+        setStatusMessage('Discovering new terms from related queries...')
       } else if (estimatedProgress < 90) {
-        setStatusMessage('Fetching Google Trends data (this takes a while)...')
+        setStatusMessage('Embedding and clustering discovered terms...')
       } else {
         setStatusMessage('Loading SDOH data and finalizing...')
       }
@@ -185,19 +193,34 @@ export default function PipelinePanel() {
 
       {/* Current Stats */}
       {stats && (
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <div className="bg-surface rounded-lg p-2 text-center">
-            <div className="text-lg font-semibold text-white">{stats.terms}</div>
-            <div className="text-gray-500">Terms</div>
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="bg-surface rounded-lg p-2 text-center">
+              <div className="text-lg font-semibold text-white">{stats.terms}</div>
+              <div className="text-gray-500">Terms</div>
+            </div>
+            <div className="bg-surface rounded-lg p-2 text-center">
+              <div className="text-lg font-semibold text-white">{stats.trend_data_points.toLocaleString()}</div>
+              <div className="text-gray-500">Trend Points</div>
+            </div>
+            <div className="bg-surface rounded-lg p-2 text-center">
+              <div className="text-lg font-semibold text-white">{stats.geographic_regions}</div>
+              <div className="text-gray-500">Regions</div>
+            </div>
           </div>
-          <div className="bg-surface rounded-lg p-2 text-center">
-            <div className="text-lg font-semibold text-white">{stats.trend_data_points}</div>
-            <div className="text-gray-500">Trend Points</div>
-          </div>
-          <div className="bg-surface rounded-lg p-2 text-center">
-            <div className="text-lg font-semibold text-white">{stats.geographic_regions}</div>
-            <div className="text-gray-500">Regions</div>
-          </div>
+          {/* Secondary stats row */}
+          {(stats.related_queries > 0 || stats.discovered_terms > 0) && (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-surface rounded-lg p-2 text-center">
+                <div className="text-lg font-semibold text-purple-400">{stats.related_queries.toLocaleString()}</div>
+                <div className="text-gray-500">Related Queries</div>
+              </div>
+              <div className="bg-surface rounded-lg p-2 text-center">
+                <div className="text-lg font-semibold text-yellow-400">{stats.discovered_terms}</div>
+                <div className="text-gray-500">Discovered Terms</div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -205,7 +228,10 @@ export default function PipelinePanel() {
       {hasTrendData ? (
         <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
           <CheckCircle className="w-4 h-4 text-green-400" />
-          <span className="text-xs text-green-400">Real Google Trends data loaded</span>
+          <span className="text-xs text-green-400">
+            5-year trend data loaded
+            {stats && stats.discovered_terms > 0 && ` · ${stats.discovered_terms} terms auto-discovered`}
+          </span>
         </div>
       ) : (
         <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
@@ -248,19 +274,23 @@ export default function PipelinePanel() {
           <div className="flex justify-between pt-2 border-t border-white/10">
             <div className={`flex flex-col items-center ${progress > 0 ? 'text-cyan-400' : 'text-gray-600'}`}>
               <div className={`w-3 h-3 rounded-full transition-all ${progress > 0 ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50' : 'bg-gray-600'}`} />
-              <span className="text-xs mt-1">Taxonomy</span>
+              <span className="text-[10px] mt-1">Taxonomy</span>
             </div>
-            <div className={`flex flex-col items-center ${progress > 20 ? 'text-cyan-400' : 'text-gray-600'}`}>
-              <div className={`w-3 h-3 rounded-full transition-all ${progress > 20 ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50' : 'bg-gray-600'}`} />
-              <span className="text-xs mt-1">Embeddings</span>
+            <div className={`flex flex-col items-center ${progress > 10 ? 'text-cyan-400' : 'text-gray-600'}`}>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 10 ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50' : 'bg-gray-600'}`} />
+              <span className="text-[10px] mt-1">Embed</span>
             </div>
-            <div className={`flex flex-col items-center ${progress > 40 ? 'text-pink-400' : 'text-gray-600'}`}>
-              <div className={`w-3 h-3 rounded-full transition-all ${progress > 40 ? 'bg-pink-400 shadow-lg shadow-pink-400/50 animate-pulse' : 'bg-gray-600'}`} />
-              <span className="text-xs mt-1">Trends</span>
+            <div className={`flex flex-col items-center ${progress > 20 ? 'text-pink-400' : 'text-gray-600'}`}>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 20 ? 'bg-pink-400 shadow-lg shadow-pink-400/50 animate-pulse' : 'bg-gray-600'}`} />
+              <span className="text-[10px] mt-1">Trends</span>
+            </div>
+            <div className={`flex flex-col items-center ${progress > 75 ? 'text-yellow-400' : 'text-gray-600'}`}>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 75 ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse' : 'bg-gray-600'}`} />
+              <span className="text-[10px] mt-1">Discover</span>
             </div>
             <div className={`flex flex-col items-center ${progress > 90 ? 'text-green-400' : 'text-gray-600'}`}>
               <div className={`w-3 h-3 rounded-full transition-all ${progress > 90 ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`} />
-              <span className="text-xs mt-1">SDOH</span>
+              <span className="text-[10px] mt-1">SDOH</span>
             </div>
           </div>
         </div>
@@ -289,20 +319,20 @@ export default function PipelinePanel() {
         {isRunning ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-base">Fetching Google Trends Data...</span>
+            <span className="text-base">Fetching Intelligence Data...</span>
           </>
         ) : (
           <>
             <Play className="w-5 h-5" />
-            <span className="text-base">{hasTrendData ? 'Refresh Google Trends' : '▶ Fetch Google Trends Data'}</span>
+            <span className="text-base">{hasTrendData ? 'Refresh Data' : '▶ Fetch Intelligence Data'}</span>
           </>
         )}
       </button>
 
       {/* Info */}
       <p className="text-[10px] text-gray-500 text-center">
-        Fetches 5 years of Google Trends data for all {stats?.terms || '~300'} terms.
-        Takes ~{formatTime(estimatedTotalTime)} due to API rate limits.
+        Fetches 5-year trends, related queries & topics via SerpAPI for all {stats?.terms || '~300'} terms.
+        Auto-discovers emerging terms. Evidence sources queried on-demand.
       </p>
     </div>
   )

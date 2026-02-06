@@ -7,7 +7,7 @@ A visual analytics platform for exploring oncology and rare disease search trend
 ## Features
 
 - **3D Semantic Clustering**: Navigate search terms in 3D space, clustered by semantic similarity using OpenAI embeddings + UMAP
-- **Google Trends Integration**: Pulls interest-over-time and geographic interest data via pytrends
+- **Google Trends Integration**: Pulls interest-over-time and geographic interest data via SerpAPI
 - **SDOH Overlay**: CDC Social Vulnerability Index data at state/county level for health equity analysis
 - **Interactive Dashboard**: Filter by category, geography, and time; drill into cluster details
 - **Content Mapping**: Associate curated resources, PubMed articles, or your own content with search clusters
@@ -162,6 +162,7 @@ curl -X POST http://localhost:8000/api/pipeline/run \
 |----------|-------------|
 | `DATABASE_URL` | Neon PostgreSQL connection string |
 | `OPENAI_API_KEY` | OpenAI API key for embeddings |
+| `SERPAPI_KEY` | SerpAPI key for Google Trends data |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure blob storage (optional) |
 | `NEXT_PUBLIC_API_URL` | Backend API URL for frontend |
 
@@ -197,7 +198,7 @@ curl -X POST http://localhost:8000/api/pipeline/run \
 
 ## Data Sources
 
-- **Google Trends**: Via pytrends (unofficial API)
+- **Google Trends**: Via SerpAPI (reliable, structured API)
 - **SDOH**: CDC Social Vulnerability Index (SVI)
 - **Embeddings**: OpenAI text-embedding-3-small
 

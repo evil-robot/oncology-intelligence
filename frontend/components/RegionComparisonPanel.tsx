@@ -292,7 +292,7 @@ export default function RegionComparisonPanel({ selectedRegions = ['US', 'GB'] }
       <div className="pt-2 border-t border-border">
         <p className="text-xs text-gray-500">
           Interest scores range from 0-100, representing relative search volume.
-          Data from Google Trends.
+          Data via SerpAPI.
         </p>
       </div>
     </div>

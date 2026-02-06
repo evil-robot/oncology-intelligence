@@ -72,7 +72,7 @@ export default function HomePage() {
           </div>
           <div className="border-l border-border pl-4">
             <h1 className="text-lg font-semibold">Oncology & Rare Disease Intelligence</h1>
-            <p className="text-xs text-gray-500">Search trends across cancer types and rare conditions with SDOH overlay</p>
+            <p className="text-xs text-gray-500">Multi-source intelligence across cancer types and rare conditions</p>
           </div>
         </div>
 

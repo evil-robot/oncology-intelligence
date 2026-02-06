@@ -129,7 +129,7 @@ async def trigger_pipeline(
 @router.get("/stats")
 async def get_pipeline_stats(db: Session = Depends(get_db)):
     """Get overall pipeline statistics."""
-    from app.models import SearchTerm, Cluster, TrendData, GeographicRegion
+    from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, RelatedQuery
     from sqlalchemy import func
 
     return {
@@ -142,5 +142,9 @@ async def get_pipeline_stats(db: Session = Depends(get_db)):
         "geographic_regions": db.query(func.count(GeographicRegion.id)).scalar(),
         "regions_with_sdoh": db.query(func.count(GeographicRegion.id)).filter(
             GeographicRegion.svi_overall.isnot(None)
+        ).scalar(),
+        "related_queries": db.query(func.count(RelatedQuery.id)).scalar(),
+        "discovered_terms": db.query(func.count(SearchTerm.id)).filter(
+            SearchTerm.subcategory.like("discovered:%")
         ).scalar(),
     }

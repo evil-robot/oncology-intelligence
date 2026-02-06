@@ -44,7 +44,8 @@ class SearchTerm(Base):
     # Relationships
     cluster = relationship("Cluster", back_populates="terms")
     trend_data = relationship("TrendData", back_populates="term")
-    parent = relationship("SearchTerm", remote_side=[id])
+    parent = relationship("SearchTerm", remote_side=[id], foreign_keys=[parent_term_id])
+    related_queries = relationship("RelatedQuery", foreign_keys="RelatedQuery.source_term_id", back_populates="source_term")
 
     __table_args__ = (
         Index("ix_search_terms_embedding", embedding, postgresql_using="ivfflat"),
@@ -190,6 +191,37 @@ class Post(Base):
 
     __table_args__ = (
         Index("ix_posts_embedding", embedding, postgresql_using="ivfflat"),
+    )
+
+
+class RelatedQuery(Base):
+    """Related queries and topics discovered from Google Trends via SerpAPI."""
+
+    __tablename__ = "related_queries"
+
+    id = Column(Integer, primary_key=True)
+    source_term_id = Column(Integer, ForeignKey("search_terms.id"), nullable=False, index=True)
+
+    # The related query or topic
+    query = Column(String(500), nullable=False)
+    query_type = Column(String(20), nullable=False)  # "rising_query", "top_query", "rising_topic", "top_topic"
+    topic_type = Column(String(100))  # For topics: "Disease", "Drug", "Treatment", etc.
+
+    # Value: percentage for rising (e.g., 450), or relative score for top (0-100)
+    value = Column(String(50))  # Raw value string (e.g., "Breakout", "+450%", "100")
+    extracted_value = Column(Integer)  # Numeric value
+
+    # Whether this query was promoted to a full SearchTerm in the taxonomy
+    is_promoted = Column(Boolean, default=False)
+    promoted_term_id = Column(Integer, ForeignKey("search_terms.id"), nullable=True)
+
+    discovered_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    source_term = relationship("SearchTerm", foreign_keys=[source_term_id], back_populates="related_queries")
+
+    __table_args__ = (
+        Index("ix_related_queries_source_type", "source_term_id", "query_type"),
     )
 
 

@@ -1,18 +1,27 @@
 """
-Google Trends data fetcher using pytrends.
+Google Trends data fetcher using SerpAPI.
 
-Fetches interest-over-time and interest-by-region data for pediatric oncology terms.
-Handles rate limiting and batch processing.
+Fetches interest-over-time and interest-by-region data for oncology and rare disease terms.
+Replaces the previous pytrends-based implementation with the reliable SerpAPI Google Trends API.
+
+SerpAPI data_type options:
+  - TIMESERIES: Interest over time (up to 5 queries)
+  - GEO_MAP_0: Interest by region (single query)
+  - GEO_MAP: Compared breakdown by region (up to 5 queries)
+  - RELATED_QUERIES: Related queries (single query)
+  - RELATED_TOPICS: Related topics (single query)
 """
 
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass
 
 import pandas as pd
-from pytrends.request import TrendReq
+from serpapi import GoogleSearch
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,22 +34,187 @@ class TrendResult:
     interest_over_time: Optional[pd.DataFrame]
     interest_by_region: Optional[pd.DataFrame]
     related_queries: Optional[dict]
+    related_topics: Optional[dict]
     fetched_at: datetime
 
 
 class TrendsFetcher:
-    """Fetches Google Trends data with rate limiting and error handling."""
+    """Fetches Google Trends data via SerpAPI with rate limiting and error handling."""
 
     def __init__(
         self,
-        hl: str = "en-US",
-        tz: int = 360,
-        timeout: tuple = (10, 25),
-        retries: int = 3,
-        backoff_factor: float = 1.5,
+        api_key: Optional[str] = None,
+        request_delay: float = 0.5,
     ):
-        self.pytrends = TrendReq(hl=hl, tz=tz, timeout=timeout, retries=retries, backoff_factor=backoff_factor)
-        self.request_delay = 2.0  # Seconds between requests to avoid rate limiting
+        settings = get_settings()
+        self.api_key = api_key or settings.serpapi_key
+        if not self.api_key:
+            raise ValueError("SERPAPI_KEY is required. Set it in your .env file or pass it directly.")
+        self.request_delay = request_delay  # SerpAPI is much faster than pytrends, less delay needed
+
+    def _search(self, params: dict) -> dict:
+        """Execute a SerpAPI search and return parsed results."""
+        params["api_key"] = self.api_key
+        params["engine"] = "google_trends"
+        search = GoogleSearch(params)
+        return search.get_dict()
+
+    def _fetch_interest_over_time(
+        self,
+        term: str,
+        date: str = "today 12-m",
+        geo: str = "US",
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch interest over time for a single term.
+
+        Returns DataFrame with columns: date, interest
+        """
+        try:
+            params = {
+                "q": term,
+                "date": date,
+                "geo": geo,
+                "data_type": "TIMESERIES",
+            }
+            results = self._search(params)
+            time.sleep(self.request_delay)
+
+            iot_data = results.get("interest_over_time", {})
+            timeline = iot_data.get("timeline_data", [])
+
+            if not timeline:
+                logger.warning(f"No interest_over_time data for '{term}'")
+                return None
+
+            records = []
+            for point in timeline:
+                # Parse date — SerpAPI returns date strings like "Jan 1 – 7, 2024"
+                # Use the timestamp if available, otherwise parse the date string
+                date_str = point.get("date", "")
+                values = point.get("values", [])
+
+                # Find the value matching our term
+                interest = 0
+                for val in values:
+                    if val.get("query", "").lower() == term.lower():
+                        interest = val.get("extracted_value", 0)
+                        break
+                else:
+                    # If no exact match, use the first value
+                    if values:
+                        interest = values[0].get("extracted_value", 0)
+
+                # Try to parse a usable date from the timestamp or date string
+                timestamp = point.get("timestamp")
+                if timestamp:
+                    dt = datetime.fromtimestamp(int(timestamp))
+                else:
+                    # Use the start of the date range
+                    try:
+                        # Date format: "Jan 1 – 7, 2024" or "Jan 2024"
+                        clean_date = date_str.split("–")[0].split("—")[0].strip().rstrip(",").strip()
+                        # Try various formats
+                        for fmt in ["%b %d %Y", "%b %d, %Y", "%b %Y", "%Y-%m-%d"]:
+                            try:
+                                dt = datetime.strptime(clean_date, fmt)
+                                break
+                            except ValueError:
+                                continue
+                        else:
+                            continue  # Skip this point if we can't parse the date
+                    except Exception:
+                        continue
+
+                records.append({
+                    "date": dt,
+                    term: interest,
+                })
+
+            if not records:
+                return None
+
+            df = pd.DataFrame(records)
+            df = df.set_index("date")
+            logger.debug(f"Got {len(df)} time points for '{term}'")
+            return df
+
+        except Exception as e:
+            logger.warning(f"Failed to get interest_over_time for '{term}': {e}")
+            return None
+
+    def _fetch_interest_by_region(
+        self,
+        term: str,
+        date: str = "today 12-m",
+        geo: str = "US",
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch interest by region for a single term.
+
+        Returns DataFrame with columns: geoCode, geoName, interest
+        """
+        try:
+            params = {
+                "q": term,
+                "date": date,
+                "geo": geo,
+                "data_type": "GEO_MAP_0",
+            }
+            results = self._search(params)
+            time.sleep(self.request_delay)
+
+            regions = results.get("interest_by_region", [])
+
+            if not regions:
+                logger.warning(f"No interest_by_region data for '{term}'")
+                return None
+
+            records = []
+            for region in regions:
+                geo_code = region.get("geo", "")
+                location = region.get("location", "")
+                interest = region.get("extracted_value", 0)
+
+                records.append({
+                    "geoCode": geo_code,
+                    "geoName": location,
+                    term: interest,
+                })
+
+            df = pd.DataFrame(records)
+            df = df.set_index("geoName")
+            logger.debug(f"Got {len(df)} regions for '{term}'")
+            return df
+
+        except Exception as e:
+            logger.warning(f"Failed to get interest_by_region for '{term}': {e}")
+            return None
+
+    def _fetch_related_queries(
+        self,
+        term: str,
+        date: str = "today 12-m",
+        geo: str = "US",
+    ) -> Optional[dict]:
+        """Fetch related queries for a single term."""
+        try:
+            params = {
+                "q": term,
+                "date": date,
+                "geo": geo,
+                "data_type": "RELATED_QUERIES",
+            }
+            results = self._search(params)
+            time.sleep(self.request_delay)
+
+            related = results.get("related_queries", {})
+            logger.debug(f"Got related queries for '{term}'")
+            return related if related else None
+
+        except Exception as e:
+            logger.warning(f"Failed to get related_queries for '{term}': {e}")
+            return None
 
     def fetch_term(
         self,
@@ -49,70 +223,47 @@ class TrendsFetcher:
         geo: str = "US",
         include_regions: bool = True,
         include_related: bool = True,
+        include_topics: bool = True,
     ) -> TrendResult:
         """
         Fetch all trend data for a single term.
 
         Args:
             term: Search term to fetch
-            timeframe: Time range (e.g., "today 12-m", "2023-01-01 2024-01-01")
+            timeframe: Time range (e.g., "today 12-m", "today 5-y", "2023-01-01 2024-01-01")
             geo: Geographic region (e.g., "US", "US-CA")
             include_regions: Whether to fetch interest by region
             include_related: Whether to fetch related queries
+            include_topics: Whether to fetch related topics
 
         Returns:
             TrendResult with all fetched data
         """
         logger.info(f"Fetching trends for: {term}")
 
-        interest_over_time = None
+        # SerpAPI uses 'date' parameter with same format as pytrends 'timeframe'
+        date_param = timeframe
+
+        interest_over_time = self._fetch_interest_over_time(term, date=date_param, geo=geo)
+
         interest_by_region = None
+        if include_regions:
+            interest_by_region = self._fetch_interest_by_region(term, date=date_param, geo=geo)
+
         related_queries = None
+        if include_related:
+            related_queries = self._fetch_related_queries(term, date=date_param, geo=geo)
 
-        try:
-            # Build payload
-            self.pytrends.build_payload([term], cat=0, timeframe=timeframe, geo=geo)
-            time.sleep(self.request_delay)
-
-            # Interest over time
-            try:
-                interest_over_time = self.pytrends.interest_over_time()
-                if not interest_over_time.empty:
-                    interest_over_time = interest_over_time.drop(columns=["isPartial"], errors="ignore")
-                logger.debug(f"Got {len(interest_over_time)} time points for {term}")
-            except Exception as e:
-                logger.warning(f"Failed to get interest_over_time for {term}: {e}")
-
-            time.sleep(self.request_delay)
-
-            # Interest by region
-            if include_regions:
-                try:
-                    interest_by_region = self.pytrends.interest_by_region(
-                        resolution="REGION", inc_low_vol=True, inc_geo_code=True
-                    )
-                    logger.debug(f"Got {len(interest_by_region)} regions for {term}")
-                except Exception as e:
-                    logger.warning(f"Failed to get interest_by_region for {term}: {e}")
-
-                time.sleep(self.request_delay)
-
-            # Related queries
-            if include_related:
-                try:
-                    related_queries = self.pytrends.related_queries()
-                    logger.debug(f"Got related queries for {term}")
-                except Exception as e:
-                    logger.warning(f"Failed to get related_queries for {term}: {e}")
-
-        except Exception as e:
-            logger.error(f"Error fetching trends for {term}: {e}")
+        related_topics = None
+        if include_topics:
+            related_topics = self._fetch_related_topics(term, date=date_param, geo=geo)
 
         return TrendResult(
             term=term,
             interest_over_time=interest_over_time,
             interest_by_region=interest_by_region,
             related_queries=related_queries,
+            related_topics=related_topics,
             fetched_at=datetime.utcnow(),
         )
 
@@ -143,10 +294,10 @@ class TrendsFetcher:
             result = self.fetch_term(term, timeframe=timeframe, geo=geo, **kwargs)
             results.append(result)
 
-            # Extra delay between batches to be nice to the API
-            if (i + 1) % 5 == 0:
+            # Brief delay between terms (SerpAPI is more forgiving than pytrends)
+            if (i + 1) % 10 == 0:
                 logger.info("Batch delay...")
-                time.sleep(5)
+                time.sleep(2)
 
         return results
 
@@ -158,6 +309,8 @@ class TrendsFetcher:
     ) -> Optional[pd.DataFrame]:
         """
         Fetch comparative interest over time for up to 5 terms.
+
+        SerpAPI's TIMESERIES data_type supports up to 5 comma-separated queries.
 
         Args:
             terms: List of 2-5 terms to compare
@@ -172,27 +325,74 @@ class TrendsFetcher:
             terms = terms[:5]
 
         try:
-            self.pytrends.build_payload(terms, cat=0, timeframe=timeframe, geo=geo)
-            time.sleep(self.request_delay)
+            params = {
+                "q": ",".join(terms),
+                "date": timeframe,
+                "geo": geo,
+                "data_type": "TIMESERIES",
+            }
+            results = self._search(params)
 
-            df = self.pytrends.interest_over_time()
-            if not df.empty:
-                df = df.drop(columns=["isPartial"], errors="ignore")
+            iot_data = results.get("interest_over_time", {})
+            timeline = iot_data.get("timeline_data", [])
+
+            if not timeline:
+                return None
+
+            records = []
+            for point in timeline:
+                row = {}
+                timestamp = point.get("timestamp")
+                if timestamp:
+                    row["date"] = datetime.fromtimestamp(int(timestamp))
+                else:
+                    continue
+
+                for val in point.get("values", []):
+                    query = val.get("query", "")
+                    row[query] = val.get("extracted_value", 0)
+
+                records.append(row)
+
+            if not records:
+                return None
+
+            df = pd.DataFrame(records).set_index("date")
             return df
 
         except Exception as e:
             logger.error(f"Error fetching comparison: {e}")
             return None
 
-    def get_related_topics(self, term: str, geo: str = "US") -> dict:
-        """Fetch related topics for term expansion."""
+    def _fetch_related_topics(
+        self,
+        term: str,
+        date: str = "today 12-m",
+        geo: str = "US",
+    ) -> Optional[dict]:
+        """Fetch related topics for a single term."""
         try:
-            self.pytrends.build_payload([term], geo=geo)
+            params = {
+                "q": term,
+                "date": date,
+                "geo": geo,
+                "data_type": "RELATED_TOPICS",
+            }
+            results = self._search(params)
             time.sleep(self.request_delay)
-            return self.pytrends.related_topics()
+
+            related = results.get("related_topics", {})
+            logger.debug(f"Got related topics for '{term}'")
+            return related if related else None
+
         except Exception as e:
-            logger.error(f"Error fetching related topics for {term}: {e}")
-            return {}
+            logger.warning(f"Failed to get related_topics for '{term}': {e}")
+            return None
+
+    def get_related_topics(self, term: str, geo: str = "US") -> dict:
+        """Fetch related topics for term expansion (convenience method)."""
+        result = self._fetch_related_topics(term, geo=geo)
+        return result or {}
 
 
 def transform_interest_over_time(
@@ -213,7 +413,7 @@ def transform_interest_over_time(
     for date, row in df.iterrows():
         records.append({
             "term": result.term,
-            "date": date.to_pydatetime(),
+            "date": date.to_pydatetime() if hasattr(date, 'to_pydatetime') else date,
             "interest": int(row[result.term]) if result.term in row else 0,
             "geo_code": geo_code,
             "geo_level": "country" if len(geo_code) == 2 else "state",
@@ -242,6 +442,76 @@ def transform_interest_by_region(result: TrendResult) -> list[dict]:
             "geo_name": row.get("geoName", row.name if hasattr(row, "name") else ""),
             "interest": int(row[result.term]) if result.term in row else 0,
             "geo_level": "state",
+        })
+
+    return records
+
+
+def transform_related_queries(result: TrendResult) -> list[dict]:
+    """
+    Transform related_queries dict to records for database insertion.
+
+    Returns list of dicts with keys: query, query_type, value, extracted_value
+    """
+    if not result.related_queries:
+        return []
+
+    records = []
+
+    # Process rising queries
+    for item in result.related_queries.get("rising", []):
+        records.append({
+            "query": item.get("query", ""),
+            "query_type": "rising_query",
+            "topic_type": None,
+            "value": str(item.get("value", "")),
+            "extracted_value": item.get("extracted_value", 0),
+        })
+
+    # Process top queries
+    for item in result.related_queries.get("top", []):
+        records.append({
+            "query": item.get("query", ""),
+            "query_type": "top_query",
+            "topic_type": None,
+            "value": str(item.get("value", "")),
+            "extracted_value": item.get("extracted_value", 0),
+        })
+
+    return records
+
+
+def transform_related_topics(result: TrendResult) -> list[dict]:
+    """
+    Transform related_topics dict to records for database insertion.
+
+    Returns list of dicts with keys: query, query_type, topic_type, value, extracted_value
+    """
+    if not result.related_topics:
+        return []
+
+    records = []
+
+    # Process rising topics
+    for item in result.related_topics.get("rising", []):
+        topic = item.get("topic", {})
+        records.append({
+            "query": topic.get("title", ""),
+            "query_type": "rising_topic",
+            "topic_type": topic.get("type", ""),
+            "value": str(item.get("value", "")),
+            "extracted_value": item.get("extracted_value", 0),
+        })
+
+    # Process top topics
+    for item in result.related_topics.get("top", []):
+        topic = item.get("topic", {})
+        records.append({
+            "query": topic.get("title", ""),
+            "query_type": "top_topic",
+            "topic_type": topic.get("type", ""),
+            "value": str(item.get("value", "")),
+            "extracted_value": item.get("extracted_value", 0),
         })
 
     return records

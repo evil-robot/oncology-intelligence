@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import SearchTerm
+from app.models import SearchTerm, RelatedQuery
 
 router = APIRouter()
 
@@ -134,4 +134,64 @@ async def get_similar_terms(
             "cluster_id": t.cluster_id,
         }
         for t in similar
+    ]
+
+
+@router.get("/{term_id}/related")
+async def get_related_queries(
+    term_id: int,
+    db: Session = Depends(get_db),
+    query_type: Optional[str] = Query(None, description="Filter by type: rising_query, top_query, rising_topic, top_topic"),
+):
+    """Get related queries and topics discovered for this term."""
+    query = db.query(RelatedQuery).filter(RelatedQuery.source_term_id == term_id)
+
+    if query_type:
+        query = query.filter(RelatedQuery.query_type == query_type)
+
+    results = query.order_by(RelatedQuery.extracted_value.desc()).all()
+
+    return {
+        "term_id": term_id,
+        "count": len(results),
+        "related": [
+            {
+                "id": rq.id,
+                "query": rq.query,
+                "query_type": rq.query_type,
+                "topic_type": rq.topic_type,
+                "value": rq.value,
+                "extracted_value": rq.extracted_value,
+                "is_promoted": rq.is_promoted,
+                "promoted_term_id": rq.promoted_term_id,
+            }
+            for rq in results
+        ],
+    }
+
+
+@router.get("/discovered/all")
+async def list_discovered_terms(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, le=200),
+):
+    """List terms that were auto-discovered from related queries."""
+    terms = (
+        db.query(SearchTerm)
+        .filter(SearchTerm.subcategory.like("discovered:%"))
+        .order_by(SearchTerm.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "id": t.id,
+            "term": t.term,
+            "category": t.category,
+            "subcategory": t.subcategory,
+            "parent_term_id": t.parent_term_id,
+            "cluster_id": t.cluster_id,
+        }
+        for t in terms
     ]

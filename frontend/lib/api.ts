@@ -217,9 +217,13 @@ export const api = {
   // Pipeline
   getPipelineStats: () => fetchApi<{
     terms: number
+    terms_with_embeddings: number
     clusters: number
     trend_data_points: number
     geographic_regions: number
+    regions_with_sdoh: number
+    related_queries: number
+    discovered_terms: number
   }>('/api/pipeline/stats'),
   triggerPipeline: (config?: { fetch_trends?: boolean; timeframe?: string; geo?: string }) =>
     fetchApi<{ run_id: number }>('/api/pipeline/run', { method: 'POST', body: config }),

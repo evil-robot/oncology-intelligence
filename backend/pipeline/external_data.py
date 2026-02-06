@@ -5,7 +5,9 @@ Integrates:
 - ClinicalTrials.gov - Active clinical trials
 - FDA openFDA - Drug approvals and safety
 - PubMed - Research publications
-- News - Media coverage
+- Google Scholar (SerpAPI) - Academic research with citation data
+- Google News (SerpAPI) - Structured news coverage
+- Google Patents (SerpAPI) - Patent filings and innovation pipeline
 """
 
 import logging
@@ -13,7 +15,11 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 import httpx
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from serpapi import GoogleSearch
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +27,6 @@ logger = logging.getLogger(__name__)
 CLINICALTRIALS_API = "https://clinicaltrials.gov/api/v2/studies"
 OPENFDA_API = "https://api.fda.gov/drug"
 PUBMED_API = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-NEWS_API = "https://newsdata.io/api/1/news"  # Free tier available
 
 
 @dataclass
@@ -99,6 +104,7 @@ class NewsArticle:
     url: str
     published_at: str
     description: Optional[str]
+    thumbnail: Optional[str] = None
 
     def to_dict(self):
         return {
@@ -107,6 +113,49 @@ class NewsArticle:
             "url": self.url,
             "published_at": self.published_at,
             "description": self.description,
+            "thumbnail": self.thumbnail,
+        }
+
+
+@dataclass
+class ScholarArticle:
+    title: str
+    authors: list[str]
+    url: str
+    cited_by: int
+    year: Optional[str]
+    snippet: Optional[str]
+    publication: Optional[str]
+
+    def to_dict(self):
+        return {
+            "title": self.title,
+            "authors": self.authors,
+            "url": self.url,
+            "cited_by": self.cited_by,
+            "year": self.year,
+            "snippet": self.snippet,
+            "publication": self.publication,
+        }
+
+
+@dataclass
+class PatentResult:
+    title: str
+    patent_id: str
+    assignee: Optional[str]
+    filing_date: Optional[str]
+    url: str
+    snippet: Optional[str]
+
+    def to_dict(self):
+        return {
+            "title": self.title,
+            "patent_id": self.patent_id,
+            "assignee": self.assignee,
+            "filing_date": self.filing_date,
+            "url": self.url,
+            "snippet": self.snippet,
         }
 
 
@@ -361,54 +410,172 @@ class PubMedClient:
         await self.client.aclose()
 
 
-class NewsClient:
-    """Client for news aggregation."""
+class GoogleNewsClient:
+    """Client for Google News via SerpAPI — structured, reliable news data."""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key
-        self.client = httpx.AsyncClient(timeout=30.0)
+        settings = get_settings()
+        self.api_key = api_key or settings.serpapi_key
 
     async def search_health_news(
         self,
         query: str,
         max_results: int = 5,
     ) -> list[NewsArticle]:
-        """Search for health news articles using free sources."""
-        articles = []
+        """Search Google News via SerpAPI for structured news results."""
+        if not self.api_key:
+            logger.warning("SERPAPI_KEY not set, skipping Google News")
+            return []
 
-        # Try Google News RSS (no API key needed)
         try:
-            import xml.etree.ElementTree as ET
+            params = {
+                "api_key": self.api_key,
+                "engine": "google_news",
+                "q": f"{query} health oncology",
+                "gl": "us",
+                "hl": "en",
+            }
 
-            rss_url = f"https://news.google.com/rss/search?q={query}+health&hl=en-US&gl=US&ceid=US:en"
-            response = await self.client.get(rss_url)
+            # Run synchronous SerpAPI call in executor to keep async
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None, lambda: GoogleSearch(params).get_dict()
+            )
 
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
+            articles = []
+            for item in results.get("news_results", [])[:max_results]:
+                articles.append(NewsArticle(
+                    title=item.get("title", ""),
+                    source=item.get("source", {}).get("name", "Unknown"),
+                    url=item.get("link", ""),
+                    published_at=item.get("date", ""),
+                    description=item.get("snippet", None),
+                    thumbnail=item.get("thumbnail", None),
+                ))
 
-                for item in root.findall(".//item")[:max_results]:
-                    title = item.find("title")
-                    link = item.find("link")
-                    pub_date = item.find("pubDate")
-                    source = item.find("source")
-
-                    articles.append(NewsArticle(
-                        title=title.text if title is not None else "",
-                        source=source.text if source is not None else "Google News",
-                        url=link.text if link is not None else "",
-                        published_at=pub_date.text if pub_date is not None else "",
-                        description=None,
-                    ))
-
-            logger.info(f"Found {len(articles)} news articles for '{query}'")
+            logger.info(f"Found {len(articles)} news articles for '{query}' via SerpAPI")
+            return articles
 
         except Exception as e:
-            logger.error(f"News search error: {e}")
-
-        return articles
+            logger.error(f"Google News SerpAPI error: {e}")
+            return []
 
     async def close(self):
-        await self.client.aclose()
+        pass  # No persistent connection to close
+
+
+class GoogleScholarClient:
+    """Client for Google Scholar via SerpAPI — academic research with citations."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        settings = get_settings()
+        self.api_key = api_key or settings.serpapi_key
+
+    async def search(
+        self,
+        query: str,
+        max_results: int = 5,
+    ) -> list[ScholarArticle]:
+        """Search Google Scholar for academic papers with citation counts."""
+        if not self.api_key:
+            logger.warning("SERPAPI_KEY not set, skipping Google Scholar")
+            return []
+
+        try:
+            params = {
+                "api_key": self.api_key,
+                "engine": "google_scholar",
+                "q": query,
+                "num": max_results,
+                "as_ylo": str(datetime.now().year - 3),  # Last 3 years
+            }
+
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None, lambda: GoogleSearch(params).get_dict()
+            )
+
+            articles = []
+            for item in results.get("organic_results", [])[:max_results]:
+                # Parse authors from publication_info
+                pub_info = item.get("publication_info", {})
+                authors_str = pub_info.get("authors", [])
+                authors = [a.get("name", "") for a in authors_str] if isinstance(authors_str, list) else []
+
+                # Citation count
+                cited_by = item.get("inline_links", {}).get("cited_by", {}).get("total", 0)
+
+                articles.append(ScholarArticle(
+                    title=item.get("title", ""),
+                    authors=authors,
+                    url=item.get("link", ""),
+                    cited_by=cited_by,
+                    year=pub_info.get("summary", "").split(",")[-1].strip() if pub_info.get("summary") else None,
+                    snippet=item.get("snippet", None),
+                    publication=pub_info.get("summary", None),
+                ))
+
+            logger.info(f"Found {len(articles)} Google Scholar results for '{query}'")
+            return articles
+
+        except Exception as e:
+            logger.error(f"Google Scholar SerpAPI error: {e}")
+            return []
+
+    async def close(self):
+        pass
+
+
+class GooglePatentsClient:
+    """Client for Google Patents via SerpAPI — patent filings and innovation signals."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        settings = get_settings()
+        self.api_key = api_key or settings.serpapi_key
+
+    async def search(
+        self,
+        query: str,
+        max_results: int = 5,
+    ) -> list[PatentResult]:
+        """Search Google Patents for recent patent filings."""
+        if not self.api_key:
+            logger.warning("SERPAPI_KEY not set, skipping Google Patents")
+            return []
+
+        try:
+            params = {
+                "api_key": self.api_key,
+                "engine": "google_patents",
+                "q": query,
+                "num": max_results,
+            }
+
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None, lambda: GoogleSearch(params).get_dict()
+            )
+
+            patents = []
+            for item in results.get("organic_results", [])[:max_results]:
+                patents.append(PatentResult(
+                    title=item.get("title", ""),
+                    patent_id=item.get("patent_id", item.get("publication_number", "")),
+                    assignee=item.get("assignee", None),
+                    filing_date=item.get("filing_date", item.get("priority_date", None)),
+                    url=item.get("pdf", item.get("link", "")),
+                    snippet=item.get("snippet", None),
+                ))
+
+            logger.info(f"Found {len(patents)} patents for '{query}'")
+            return patents
+
+        except Exception as e:
+            logger.error(f"Google Patents SerpAPI error: {e}")
+            return []
+
+    async def close(self):
+        pass
 
 
 class ExternalDataAggregator:
@@ -418,14 +585,16 @@ class ExternalDataAggregator:
         self.trials_client = ClinicalTrialsClient()
         self.fda_client = OpenFDAClient()
         self.pubmed_client = PubMedClient()
-        self.news_client = NewsClient()
+        self.news_client = GoogleNewsClient()
+        self.scholar_client = GoogleScholarClient()
+        self.patents_client = GooglePatentsClient()
 
     async def get_triangulation_data(
         self,
         term: str,
         category: Optional[str] = None,
     ) -> dict:
-        """Fetch all external data for a term."""
+        """Fetch all external data for a term from 7 sources."""
 
         # Determine search strategy based on category
         is_treatment = category in ["treatment", "adult_oncology", "pediatric_oncology"]
@@ -437,6 +606,8 @@ class ExternalDataAggregator:
             self.trials_client.search(term, max_results=5),
             self.pubmed_client.search(f"{term} clinical", max_results=5),
             self.news_client.search_health_news(term, max_results=5),
+            self.scholar_client.search(f"{term} oncology", max_results=5),
+            self.patents_client.search(f"{term} treatment therapy", max_results=5),
         ]
 
         # Add FDA search for treatments/drugs
@@ -453,7 +624,9 @@ class ExternalDataAggregator:
         trials = results[0] if not isinstance(results[0], Exception) else []
         articles = results[1] if not isinstance(results[1], Exception) else []
         news = results[2] if not isinstance(results[2], Exception) else []
-        fda_events = results[3] if not isinstance(results[3], Exception) else []
+        scholar = results[3] if not isinstance(results[3], Exception) else []
+        patents = results[4] if not isinstance(results[4], Exception) else []
+        fda_events = results[5] if not isinstance(results[5], Exception) else []
 
         return {
             "term": term,
@@ -475,20 +648,33 @@ class ExternalDataAggregator:
                 "count": len(news),
                 "items": [n.to_dict() for n in news],
             },
+            "scholar": {
+                "count": len(scholar),
+                "items": [s.to_dict() for s in scholar],
+                "top_cited": max((s.cited_by for s in scholar), default=0),
+            },
+            "patents": {
+                "count": len(patents),
+                "items": [p.to_dict() for p in patents],
+            },
             "summary": {
                 "total_sources": sum([
                     1 if trials else 0,
                     1 if articles else 0,
                     1 if fda_events else 0,
                     1 if news else 0,
+                    1 if scholar else 0,
+                    1 if patents else 0,
                 ]),
-                "evidence_strength": self._calculate_evidence_strength(trials, articles, fda_events, news),
+                "evidence_strength": self._calculate_evidence_strength(
+                    trials, articles, fda_events, news, scholar, patents
+                ),
             },
             "fetched_at": datetime.utcnow().isoformat(),
         }
 
-    def _calculate_evidence_strength(self, trials, articles, fda_events, news) -> str:
-        """Calculate overall evidence strength."""
+    def _calculate_evidence_strength(self, trials, articles, fda_events, news, scholar, patents) -> str:
+        """Calculate overall evidence strength across all sources."""
         score = 0
 
         # Clinical trials are strong evidence
@@ -496,7 +682,7 @@ class ExternalDataAggregator:
         if any(t.status == "RECRUITING" for t in trials):
             score += 5
 
-        # Publications are good evidence
+        # PubMed publications
         score += len(articles) * 2
 
         # FDA data is authoritative
@@ -505,11 +691,19 @@ class ExternalDataAggregator:
         # News indicates public interest
         score += len(news) * 1
 
-        if score >= 20:
+        # Google Scholar — highly-cited papers are strong signals
+        score += len(scholar) * 2
+        high_citation = sum(1 for s in scholar if s.cited_by > 50)
+        score += high_citation * 3
+
+        # Patents indicate innovation pipeline
+        score += len(patents) * 2
+
+        if score >= 30:
             return "strong"
-        elif score >= 10:
+        elif score >= 15:
             return "moderate"
-        elif score >= 5:
+        elif score >= 7:
             return "emerging"
         else:
             return "limited"
@@ -519,6 +713,8 @@ class ExternalDataAggregator:
         await self.fda_client.close()
         await self.pubmed_client.close()
         await self.news_client.close()
+        await self.scholar_client.close()
+        await self.patents_client.close()
 
 
 # Convenience function for route handlers

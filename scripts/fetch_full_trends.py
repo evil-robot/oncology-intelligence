@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Google Trends data fetcher.
+Comprehensive Google Trends data fetcher using SerpAPI.
 
 Pulls:
 - Interest over time (weekly for past year)
@@ -23,43 +23,57 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'backend', '.env'))
 import numpy as np
 import psycopg2
 from psycopg2.extras import execute_values
-from pytrends.request import TrendReq
+from serpapi import GoogleSearch
 from openai import OpenAI
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+SERPAPI_KEY = os.environ.get('SERPAPI_KEY')
+
+if not SERPAPI_KEY:
+    print("ERROR: SERPAPI_KEY environment variable is required")
+    sys.exit(1)
 
 print("=" * 70)
-print("Pediatric Oncology Intelligence - Full Google Trends Fetch")
+print("Oncology & Rare Disease Intelligence - Full Google Trends Fetch (SerpAPI)")
 print("=" * 70)
 
 # Initialize
-pytrends = TrendReq(hl='en-US', tz=360, timeout=(10, 25), retries=3, backoff_factor=1.5)
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 conn = psycopg2.connect(DATABASE_URL)
 conn.autocommit = True
 cur = conn.cursor()
 
-# Rate limiting
-REQUEST_DELAY = 3  # seconds between requests
+# Rate limiting (SerpAPI is more forgiving than pytrends)
+REQUEST_DELAY = 0.5  # seconds between requests
+
+
+def serpapi_search(params: dict) -> dict:
+    """Execute a SerpAPI Google Trends search."""
+    params["api_key"] = SERPAPI_KEY
+    params["engine"] = "google_trends"
+    search = GoogleSearch(params)
+    return search.get_dict()
+
 
 def safe_request(func, *args, **kwargs):
-    """Execute a pytrends request with rate limiting and error handling."""
+    """Execute a request with rate limiting and error handling."""
     time.sleep(REQUEST_DELAY)
     try:
         return func(*args, **kwargs)
     except Exception as e:
-        print(f"  ⚠ Request failed: {e}")
-        time.sleep(10)  # Extra delay on error
+        print(f"  Warning: Request failed: {e}")
+        time.sleep(5)  # Extra delay on error
         return None
+
 
 # ============================================
 # Step 1: Get all existing terms
 # ============================================
 print("\n[1/6] Loading existing terms...")
 cur.execute("SELECT id, term, category, subcategory FROM search_terms")
-existing_terms = {row[1]: {"id": row[0], "category": row[1], "subcategory": row[3]} for row in cur.fetchall()}
+existing_terms = {row[1]: {"id": row[0], "category": row[2], "subcategory": row[3]} for row in cur.fetchall()}
 print(f"  Found {len(existing_terms)} existing terms")
 
 # ============================================
@@ -70,61 +84,80 @@ print("\n[2/6] Fetching interest over time...")
 term_list = list(existing_terms.keys())
 trend_records = []
 
-# Process in batches of 5 (Google Trends limit)
+# SerpAPI supports up to 5 comma-separated queries for TIMESERIES
 for i in range(0, len(term_list), 5):
     batch = term_list[i:i+5]
     print(f"  Batch {i//5 + 1}/{(len(term_list)+4)//5}: {batch[:2]}...")
 
     try:
-        pytrends.build_payload(batch, cat=0, timeframe='today 12-m', geo='US')
-        time.sleep(REQUEST_DELAY)
+        # Interest over time (TIMESERIES supports multiple queries)
+        params = {
+            "q": ",".join(batch),
+            "date": "today 12-m",
+            "geo": "US",
+            "data_type": "TIMESERIES",
+        }
+        results = safe_request(serpapi_search, params)
 
-        # Interest over time
-        iot = pytrends.interest_over_time()
-        if iot is not None and not iot.empty:
-            iot = iot.drop(columns=['isPartial'], errors='ignore')
+        if results:
+            iot_data = results.get("interest_over_time", {})
+            timeline = iot_data.get("timeline_data", [])
 
-            for term in batch:
-                if term in iot.columns:
-                    term_id = existing_terms[term]["id"]
-                    for date, row in iot.iterrows():
+            for point in timeline:
+                timestamp = point.get("timestamp")
+                if not timestamp:
+                    continue
+                dt = datetime.fromtimestamp(int(timestamp))
+
+                for val in point.get("values", []):
+                    query = val.get("query", "")
+                    interest = val.get("extracted_value", 0)
+
+                    if query in existing_terms:
+                        term_id = existing_terms[query]["id"]
                         trend_records.append((
                             term_id,
-                            date.to_pydatetime(),
+                            dt,
                             'weekly',
                             'US',
                             'United States',
                             'country',
-                            int(row[term])
+                            int(interest)
                         ))
 
-        time.sleep(REQUEST_DELAY)
+        # Interest by region (GEO_MAP_0 only supports single query)
+        for term in batch:
+            params = {
+                "q": term,
+                "date": "today 12-m",
+                "geo": "US",
+                "data_type": "GEO_MAP_0",
+            }
+            ibr_results = safe_request(serpapi_search, params)
 
-        # Interest by region
-        ibr = safe_request(pytrends.interest_by_region, resolution='REGION', inc_low_vol=True, inc_geo_code=True)
-        if ibr is not None and not ibr.empty:
-            ibr = ibr.reset_index()
-            for term in batch:
-                if term in ibr.columns:
-                    term_id = existing_terms[term]["id"]
-                    for _, row in ibr.iterrows():
-                        geo_code = f"US-{row.get('geoCode', '')}"
-                        geo_name = row.get('geoName', str(row.name) if hasattr(row, 'name') else '')
-                        interest = int(row[term]) if row[term] > 0 else 0
-                        if interest > 0:
-                            trend_records.append((
-                                term_id,
-                                datetime.utcnow(),
-                                'snapshot',
-                                geo_code,
-                                geo_name,
-                                'state',
-                                interest
-                            ))
+            if ibr_results:
+                regions = ibr_results.get("interest_by_region", [])
+                term_id = existing_terms[term]["id"]
+
+                for region in regions:
+                    geo_code = region.get("geo", "")
+                    location = region.get("location", "")
+                    interest = region.get("extracted_value", 0)
+
+                    if interest > 0 and geo_code:
+                        trend_records.append((
+                            term_id,
+                            datetime.utcnow(),
+                            'snapshot',
+                            geo_code,
+                            location,
+                            'state',
+                            int(interest)
+                        ))
 
     except Exception as e:
-        print(f"  ✗ Error processing batch: {e}")
-        time.sleep(10)
+        print(f"  Error processing batch: {e}")
+        time.sleep(5)
 
 print(f"  Collected {len(trend_records)} trend records")
 
@@ -134,7 +167,6 @@ print(f"  Collected {len(trend_records)} trend records")
 print("\n[3/6] Fetching related queries and topics...")
 
 new_terms = []
-related_data = []
 
 # Key seed terms for discovery
 seed_terms = [
@@ -151,52 +183,56 @@ for seed in seed_terms:
     print(f"  Expanding: {seed}")
 
     try:
-        pytrends.build_payload([seed], cat=0, timeframe='today 12-m', geo='US')
-        time.sleep(REQUEST_DELAY)
-
         # Related queries
-        related = safe_request(pytrends.related_queries)
-        if related and seed in related:
-            for query_type in ['top', 'rising']:
-                df = related[seed].get(query_type)
-                if df is not None and not df.empty:
-                    for _, row in df.iterrows():
-                        query = row.get('query', '')
-                        value = row.get('value', 0)
+        params = {
+            "q": seed,
+            "date": "today 12-m",
+            "geo": "US",
+            "data_type": "RELATED_QUERIES",
+        }
+        results = safe_request(serpapi_search, params)
 
-                        # Add as potential new term if relevant
-                        if query and query.lower() not in [t.lower() for t in existing_terms]:
-                            # Check if it's pediatric/cancer related
-                            keywords = ['child', 'pediatric', 'cancer', 'tumor', 'leukemia', 'oncology', 'kid']
-                            if any(kw in query.lower() for kw in keywords):
-                                new_terms.append({
-                                    "term": query,
-                                    "source": seed,
-                                    "type": query_type,
-                                    "value": value
-                                })
+        if results:
+            related = results.get("related_queries", {})
+            for query_type in ['rising', 'top']:
+                queries = related.get(query_type, [])
+                for item in queries:
+                    query = item.get("query", "")
+                    value = item.get("extracted_value", item.get("value", 0))
+
+                    if query and query.lower() not in [t.lower() for t in existing_terms]:
+                        keywords = ['child', 'pediatric', 'cancer', 'tumor', 'leukemia', 'oncology', 'kid']
+                        if any(kw in query.lower() for kw in keywords):
+                            new_terms.append({
+                                "term": query,
+                                "source": seed,
+                                "type": query_type,
+                                "value": value if isinstance(value, (int, float)) else 0
+                            })
 
         # Related topics
-        topics = safe_request(pytrends.related_topics)
-        if topics and seed in topics:
-            for topic_type in ['top', 'rising']:
-                df = topics[seed].get(topic_type)
-                if df is not None and not df.empty:
-                    for _, row in df.iterrows():
-                        title = row.get('topic_title', '')
-                        if title and title.lower() not in [t.lower() for t in existing_terms]:
-                            keywords = ['child', 'pediatric', 'cancer', 'tumor', 'leukemia', 'oncology']
-                            if any(kw in title.lower() for kw in keywords):
-                                new_terms.append({
-                                    "term": title,
-                                    "source": seed,
-                                    "type": f"topic_{topic_type}",
-                                    "value": row.get('value', 0)
-                                })
+        params["data_type"] = "RELATED_TOPICS"
+        results = safe_request(serpapi_search, params)
+
+        if results:
+            topics = results.get("related_topics", {})
+            for topic_type in ['rising', 'top']:
+                topic_list = topics.get(topic_type, [])
+                for item in topic_list:
+                    title = item.get("topic", {}).get("title", "")
+                    if title and title.lower() not in [t.lower() for t in existing_terms]:
+                        keywords = ['child', 'pediatric', 'cancer', 'tumor', 'leukemia', 'oncology']
+                        if any(kw in title.lower() for kw in keywords):
+                            new_terms.append({
+                                "term": title,
+                                "source": seed,
+                                "type": f"topic_{topic_type}",
+                                "value": item.get("extracted_value", item.get("value", 0))
+                            })
 
     except Exception as e:
-        print(f"  ✗ Error: {e}")
-        time.sleep(10)
+        print(f"  Error: {e}")
+        time.sleep(5)
 
 print(f"  Discovered {len(new_terms)} potential new terms")
 
@@ -254,7 +290,7 @@ for term_data in unique_new:
             print(f"  + {term} ({category}/{subcategory})")
 
     except Exception as e:
-        print(f"  ✗ Failed to add {term}: {e}")
+        print(f"  Failed to add {term}: {e}")
 
 print(f"  Added {added_count} new terms")
 
@@ -273,7 +309,7 @@ if trend_records:
            VALUES %s""",
         trend_records
     )
-    print(f"  ✓ Inserted {len(trend_records)} trend records")
+    print(f"  Inserted {len(trend_records)} trend records")
 
 # ============================================
 # Step 6: Generate embeddings for new terms
@@ -285,7 +321,7 @@ terms_needing_embeddings = cur.fetchall()
 
 for term_id, term, category in terms_needing_embeddings:
     try:
-        text = f"Pediatric oncology search query about {category}: {term}"
+        text = f"Oncology and rare disease search query about {category}: {term}"
         response = openai_client.embeddings.create(
             model="text-embedding-3-small",
             input=text,
@@ -297,11 +333,11 @@ for term_id, term, category in terms_needing_embeddings:
             "UPDATE search_terms SET embedding = %s WHERE id = %s",
             (embedding, term_id)
         )
-        print(f"  ✓ Embedded: {term}")
+        print(f"  Embedded: {term}")
         time.sleep(0.1)
 
     except Exception as e:
-        print(f"  ✗ Failed: {term} - {e}")
+        print(f"  Failed: {term} - {e}")
 
 # ============================================
 # Run UMAP clustering
@@ -328,7 +364,7 @@ try:
                 (float(coords_3d[i, 0]), float(coords_3d[i, 1]), float(coords_3d[i, 2]), term_id)
             )
 
-        print(f"  ✓ Updated coordinates for {len(ids)} terms")
+        print(f"  Updated coordinates for {len(ids)} terms")
 
         # Update cluster centroids
         cur.execute("SELECT DISTINCT cluster_id FROM search_terms WHERE cluster_id IS NOT NULL")
@@ -345,7 +381,7 @@ try:
                 )
 
 except Exception as e:
-    print(f"  ⚠ UMAP failed: {e}")
+    print(f"  UMAP failed: {e}")
 
 # ============================================
 # Summary
@@ -366,7 +402,7 @@ print(f"  Trend data points: {cur.fetchone()[0]}")
 cur.execute("SELECT COUNT(DISTINCT geo_code) FROM trend_data WHERE geo_level = 'state'")
 print(f"  States with data: {cur.fetchone()[0]}")
 
-print("\n✅ Refresh http://localhost:3000 to see updated data!")
+print("\nRefresh http://localhost:3000 to see updated data!")
 
 cur.close()
 conn.close()
