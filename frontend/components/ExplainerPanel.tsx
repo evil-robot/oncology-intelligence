@@ -124,15 +124,15 @@ export default function ExplainerPanel() {
 
       {/* Modal Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-md z-[100]"
+            className="absolute inset-0 bg-black/80 backdrop-blur-md z-[10000]"
             onClick={handleClose}
           />
 
           {/* Panel */}
-          <div className="relative z-[101] glass rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
+          <div className="relative z-[10001] glass rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
             {/* Header */}
             <div className="flex-shrink-0 p-6 border-b border-white/10">
               <div className="flex items-center justify-between">
