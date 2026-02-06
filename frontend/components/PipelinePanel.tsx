@@ -96,11 +96,13 @@ export default function PipelinePanel() {
         setStatusMessage('Loading taxonomy and generating embeddings...')
       } else if (estimatedProgress < 20) {
         setStatusMessage('Clustering search terms...')
-      } else if (estimatedProgress < 75) {
+      } else if (estimatedProgress < 65) {
         setStatusMessage('Fetching trends, related queries & topics via SerpAPI...')
-      } else if (estimatedProgress < 85) {
+      } else if (estimatedProgress < 75) {
         setStatusMessage('Discovering new terms from related queries...')
-      } else if (estimatedProgress < 90) {
+      } else if (estimatedProgress < 85) {
+        setStatusMessage('Fetching hourly search patterns (anxiety windows)...')
+      } else if (estimatedProgress < 92) {
         setStatusMessage('Embedding and clustering discovered terms...')
       } else {
         setStatusMessage('Loading SDOH data and finalizing...')
@@ -284,12 +286,16 @@ export default function PipelinePanel() {
               <div className={`w-3 h-3 rounded-full transition-all ${progress > 20 ? 'bg-pink-400 shadow-lg shadow-pink-400/50 animate-pulse' : 'bg-gray-600'}`} />
               <span className="text-[10px] mt-1">Trends</span>
             </div>
-            <div className={`flex flex-col items-center ${progress > 75 ? 'text-yellow-400' : 'text-gray-600'}`}>
-              <div className={`w-3 h-3 rounded-full transition-all ${progress > 75 ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse' : 'bg-gray-600'}`} />
+            <div className={`flex flex-col items-center ${progress > 65 ? 'text-yellow-400' : 'text-gray-600'}`}>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 65 ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse' : 'bg-gray-600'}`} />
               <span className="text-[10px] mt-1">Discover</span>
             </div>
-            <div className={`flex flex-col items-center ${progress > 90 ? 'text-green-400' : 'text-gray-600'}`}>
-              <div className={`w-3 h-3 rounded-full transition-all ${progress > 90 ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`} />
+            <div className={`flex flex-col items-center ${progress > 75 ? 'text-violet-400' : 'text-gray-600'}`}>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 75 ? 'bg-violet-400 shadow-lg shadow-violet-400/50 animate-pulse' : 'bg-gray-600'}`} />
+              <span className="text-[10px] mt-1">Hourly</span>
+            </div>
+            <div className={`flex flex-col items-center ${progress > 92 ? 'text-green-400' : 'text-gray-600'}`}>
+              <div className={`w-3 h-3 rounded-full transition-all ${progress > 92 ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`} />
               <span className="text-[10px] mt-1">SDOH</span>
             </div>
           </div>
@@ -331,8 +337,8 @@ export default function PipelinePanel() {
 
       {/* Info */}
       <p className="text-[10px] text-gray-500 text-center">
-        Fetches 5-year trends, related queries & topics via SerpAPI for all {stats?.terms || '~300'} terms.
-        Auto-discovers emerging terms. Evidence sources queried on-demand.
+        Fetches 5-year trends, hourly patterns, related queries & topics via SerpAPI for all {stats?.terms || '~300'} terms.
+        Auto-discovers emerging terms. Reveals late-night anxiety search windows.
       </p>
     </div>
   )

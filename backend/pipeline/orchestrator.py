@@ -18,7 +18,7 @@ from typing import Optional
 import numpy as np
 from sqlalchemy.orm import Session
 
-from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery
+from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery, HourlyPattern
 from pipeline.taxonomy import get_seed_terms, TaxonomyTerm
 from pipeline.trends_fetcher import (
     TrendsFetcher,
@@ -26,6 +26,7 @@ from pipeline.trends_fetcher import (
     transform_interest_by_region,
     transform_related_queries,
     transform_related_topics,
+    aggregate_hourly_patterns,
 )
 from pipeline.embeddings import EmbeddingGenerator, compute_centroid
 from pipeline.clustering import ClusteringPipeline, get_cluster_color, generate_cluster_name
@@ -103,8 +104,13 @@ class PipelineOrchestrator:
                     logger.info("Step 5c: Re-clustering with discovered terms...")
                     await self._cluster_terms()
 
-            # Step 6: Load SDOH data
-            logger.info("Step 6: Loading SDOH data...")
+            # Step 6: Fetch hourly patterns for vulnerability window
+            if fetch_trends:
+                logger.info("Step 6: Fetching hourly patterns (vulnerability window)...")
+                await self._fetch_hourly_patterns(geo)
+
+            # Step 7: Load SDOH data
+            logger.info("Step 7: Loading SDOH data...")
             await self._load_sdoh_data()
 
             # Complete
@@ -418,6 +424,58 @@ class PipelineOrchestrator:
             logger.info("No new unique terms to promote from related queries")
 
         return new_terms
+
+    async def _fetch_hourly_patterns(self, geo: str) -> None:
+        """
+        Fetch 7-day hourly search data for all terms and compute vulnerability patterns.
+
+        This creates the "Search Anxiety Window" — hourly search patterns that reveal
+        when people are searching (especially late-night anxiety searches at 2am).
+        """
+        terms = self.db.query(SearchTerm).all()
+        total = len(terms)
+
+        # Clear old hourly patterns
+        self.db.query(HourlyPattern).delete()
+        self.db.commit()
+
+        patterns_stored = 0
+
+        for i, term in enumerate(terms):
+            logger.info(f"Fetching hourly patterns {i + 1}/{total}: {term.term}")
+
+            hourly_df = self.trends_fetcher.fetch_hourly(
+                term.term,
+                geo=geo,
+                window="now 7-d",
+            )
+
+            if hourly_df is None or hourly_df.empty:
+                continue
+
+            # Aggregate into hour-of-day patterns
+            patterns = aggregate_hourly_patterns(hourly_df)
+            if not patterns:
+                continue
+
+            pattern = HourlyPattern(
+                term_id=term.id,
+                hourly_avg=patterns.get("hourly_avg"),
+                day_of_week_avg=patterns.get("day_of_week"),
+                peak_hours=patterns.get("peak_hours"),
+                anxiety_index=patterns.get("anxiety_index"),
+                late_night_avg=patterns.get("late_night_avg"),
+                daytime_avg=patterns.get("daytime_avg"),
+            )
+            self.db.add(pattern)
+            patterns_stored += 1
+
+            # Commit every 10 terms
+            if (i + 1) % 10 == 0:
+                self.db.commit()
+
+        self.db.commit()
+        logger.info(f"Stored hourly patterns for {patterns_stored}/{total} terms")
 
     async def _load_sdoh_data(self) -> None:
         """Load SDOH data and update geographic regions."""

@@ -394,6 +394,75 @@ class TrendsFetcher:
         result = self._fetch_related_topics(term, geo=geo)
         return result or {}
 
+    def fetch_hourly(
+        self,
+        term: str,
+        geo: str = "US",
+        window: str = "now 7-d",
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch hourly interest data for a term over a recent window.
+
+        Google Trends provides hourly resolution for short timeframes:
+          - "now 1-H": past hour (minute resolution)
+          - "now 4-H": past 4 hours (minute resolution)
+          - "now 1-d": past 24 hours (8-minute resolution)
+          - "now 7-d": past 7 days (hourly resolution)
+
+        Returns DataFrame with columns: datetime, hour, day_of_week, interest
+        """
+        try:
+            params = {
+                "q": term,
+                "date": window,
+                "geo": geo,
+                "data_type": "TIMESERIES",
+            }
+            results = self._search(params)
+            time.sleep(self.request_delay)
+
+            iot_data = results.get("interest_over_time", {})
+            timeline = iot_data.get("timeline_data", [])
+
+            if not timeline:
+                logger.warning(f"No hourly data for '{term}'")
+                return None
+
+            records = []
+            for point in timeline:
+                timestamp = point.get("timestamp")
+                if not timestamp:
+                    continue
+
+                dt = datetime.fromtimestamp(int(timestamp))
+                values = point.get("values", [])
+                interest = 0
+                for val in values:
+                    if val.get("query", "").lower() == term.lower():
+                        interest = val.get("extracted_value", 0)
+                        break
+                else:
+                    if values:
+                        interest = values[0].get("extracted_value", 0)
+
+                records.append({
+                    "datetime": dt,
+                    "hour": dt.hour,
+                    "day_of_week": dt.weekday(),  # 0=Mon, 6=Sun
+                    "interest": interest,
+                })
+
+            if not records:
+                return None
+
+            df = pd.DataFrame(records)
+            logger.debug(f"Got {len(df)} hourly points for '{term}'")
+            return df
+
+        except Exception as e:
+            logger.warning(f"Failed to get hourly data for '{term}': {e}")
+            return None
+
 
 def transform_interest_over_time(
     result: TrendResult,
@@ -515,3 +584,54 @@ def transform_related_topics(result: TrendResult) -> list[dict]:
         })
 
     return records
+
+
+def aggregate_hourly_patterns(df: pd.DataFrame) -> dict:
+    """
+    Aggregate raw hourly data into hour-of-day patterns.
+
+    Takes the raw hourly DataFrame from fetch_hourly() and computes:
+    - Average interest per hour of day (0-23)
+    - Peak hours (highest search activity)
+    - Late-night anxiety index (11pm-4am average vs daytime average)
+
+    Returns dict with keys: hourly_avg, peak_hours, anxiety_index, late_night_avg, daytime_avg
+    """
+    if df is None or df.empty:
+        return {}
+
+    # Average interest by hour of day
+    hourly_avg = df.groupby("hour")["interest"].mean().to_dict()
+    # Fill missing hours with 0
+    hourly_avg = {h: round(hourly_avg.get(h, 0), 1) for h in range(24)}
+
+    # Find peak hours (top 3)
+    sorted_hours = sorted(hourly_avg.items(), key=lambda x: x[1], reverse=True)
+    peak_hours = [h for h, _ in sorted_hours[:3]]
+
+    # Late night = 11pm-4am (hours 23, 0, 1, 2, 3, 4)
+    late_night_hours = {23, 0, 1, 2, 3, 4}
+    late_night_values = [v for h, v in hourly_avg.items() if h in late_night_hours]
+    late_night_avg = round(sum(late_night_values) / max(len(late_night_values), 1), 1)
+
+    # Daytime = 8am-6pm (hours 8-18)
+    daytime_hours = set(range(8, 19))
+    daytime_values = [v for h, v in hourly_avg.items() if h in daytime_hours]
+    daytime_avg = round(sum(daytime_values) / max(len(daytime_values), 1), 1)
+
+    # Anxiety index: ratio of late-night to daytime (>1.0 means more searching at night)
+    anxiety_index = round(late_night_avg / max(daytime_avg, 0.1), 2)
+
+    # Day of week patterns
+    dow_avg = df.groupby("day_of_week")["interest"].mean().to_dict()
+    dow_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    day_of_week = {dow_names[d]: round(dow_avg.get(d, 0), 1) for d in range(7)}
+
+    return {
+        "hourly_avg": hourly_avg,
+        "peak_hours": peak_hours,
+        "anxiety_index": anxiety_index,
+        "late_night_avg": late_night_avg,
+        "daytime_avg": daytime_avg,
+        "day_of_week": day_of_week,
+    }

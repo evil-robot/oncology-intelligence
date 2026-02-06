@@ -13,6 +13,9 @@ module.exports = {
         primary: '#6366f1',
         secondary: '#ec4899',
       },
+      gridTemplateColumns: {
+        '24': 'repeat(24, minmax(0, 1fr))',
+      },
     },
   },
   plugins: [],

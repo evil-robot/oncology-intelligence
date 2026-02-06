@@ -15,6 +15,7 @@ import ChatPanel from '@/components/ChatPanel'
 import DataSourcesPanel from '@/components/DataSourcesPanel'
 import PipelinePanel from '@/components/PipelinePanel'
 import VulnerabilityInsightsPanel from '@/components/VulnerabilityInsightsPanel'
+import VulnerabilityWindow from '@/components/VulnerabilityWindow'
 
 // Dynamic import for Three.js component (no SSR)
 const ClusterVisualization = dynamic(
@@ -40,6 +41,9 @@ export default function HomePage() {
   const isLoading = useStore((s) => s.isLoading)
   const error = useStore((s) => s.error)
   const filters = useStore((s) => s.filters)
+  const selectedTerm = useStore((s) => s.selection.selectedTerm)
+  const terms = useStore((s) => s.terms)
+  const selectAndFocusTerm = useStore((s) => s.selectAndFocusTerm)
 
   // Load data on mount and when filters change
   useEffect(() => {
@@ -126,6 +130,13 @@ export default function HomePage() {
         {/* Right Sidebar - Detail Panel, Pipeline & Data Sources */}
         <aside className="w-96 flex-shrink-0 border-l border-border p-4 overflow-y-auto space-y-4">
           <DetailPanel />
+          <VulnerabilityWindow
+            selectedTermId={selectedTerm?.id ?? null}
+            onTermSelect={(termId) => {
+              const term = terms.find(t => t.id === termId)
+              if (term) selectAndFocusTerm(term)
+            }}
+          />
           <DataSourcesPanel />
           <PipelinePanel />
         </aside>

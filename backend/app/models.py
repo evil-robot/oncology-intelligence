@@ -225,6 +225,37 @@ class RelatedQuery(Base):
     )
 
 
+class HourlyPattern(Base):
+    """Aggregated hourly search patterns for terms — the 'vulnerability window' data.
+
+    Stores the average search intensity by hour of day, derived from 7-day hourly
+    Google Trends data. Used to identify late-night search anxiety patterns.
+    """
+
+    __tablename__ = "hourly_patterns"
+
+    id = Column(Integer, primary_key=True)
+    term_id = Column(Integer, ForeignKey("search_terms.id"), nullable=False, index=True)
+
+    # Aggregated hourly averages (JSON: {0: 12.5, 1: 8.3, ..., 23: 45.2})
+    hourly_avg = Column(JSON)
+
+    # Day of week averages (JSON: {"Mon": 25.0, "Tue": 30.1, ...})
+    day_of_week_avg = Column(JSON)
+
+    # Computed vulnerability metrics
+    peak_hours = Column(JSON)  # List of top 3 hours [22, 23, 21]
+    anxiety_index = Column(Float)  # Late-night / daytime ratio (>1.0 = more night searching)
+    late_night_avg = Column(Float)  # Average interest 11pm-4am
+    daytime_avg = Column(Float)  # Average interest 8am-6pm
+
+    # When this pattern was last computed
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    term = relationship("SearchTerm")
+
+
 class DataSource(Base):
     """Track data sources (region + timeframe combinations) that have been fetched."""
 
