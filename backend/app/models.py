@@ -256,6 +256,40 @@ class HourlyPattern(Base):
     term = relationship("SearchTerm")
 
 
+class QuestionSurface(Base):
+    """People Also Ask questions and autocomplete questions for search terms.
+
+    Stores actual human questions discovered from Google's 'People Also Ask' feature
+    and autocomplete suggestions. This is the 'narrative layer' — the literal phrasing
+    of fear, hope, and confusion that people type at 2am.
+    """
+
+    __tablename__ = "question_surface"
+
+    id = Column(Integer, primary_key=True)
+    source_term_id = Column(Integer, ForeignKey("search_terms.id"), nullable=False, index=True)
+
+    # The actual human question
+    question = Column(String(1000), nullable=False)  # "Is BRCA testing covered by insurance?"
+    snippet = Column(Text)  # Answer snippet from PAA
+    source_title = Column(String(500))  # Source page title
+    source_url = Column(String(2000))  # Source link
+
+    # Source classification
+    source_type = Column(String(50), default="people_also_ask")  # "people_also_ask" or "autocomplete"
+    rank = Column(Integer)  # Position in PAA results (1-based)
+
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    term = relationship("SearchTerm")
+
+    __table_args__ = (
+        Index("ix_question_surface_term", "source_term_id"),
+        Index("ix_question_surface_type", "source_term_id", "source_type"),
+    )
+
+
 class DataSource(Base):
     """Track data sources (region + timeframe combinations) that have been fetched."""
 

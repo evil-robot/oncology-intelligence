@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import SearchTerm, RelatedQuery
+from app.models import SearchTerm, RelatedQuery, QuestionSurface
 
 router = APIRouter()
 
@@ -194,4 +194,90 @@ async def list_discovered_terms(
             "cluster_id": t.cluster_id,
         }
         for t in terms
+    ]
+
+
+@router.get("/{term_id}/questions")
+async def get_term_questions(
+    term_id: int,
+    db: Session = Depends(get_db),
+    source_type: Optional[str] = Query(None, description="Filter: people_also_ask or autocomplete"),
+    limit: int = Query(20, le=50),
+):
+    """
+    Get People Also Ask questions and autocomplete questions for a term.
+
+    This is the Question Surface — the literal human phrasing of queries
+    around an oncology term. The 2am questions. The scared-parent questions.
+    """
+    term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
+    if not term:
+        return {"error": "Term not found"}, 404
+
+    query = db.query(QuestionSurface).filter(
+        QuestionSurface.source_term_id == term_id
+    )
+
+    if source_type:
+        query = query.filter(QuestionSurface.source_type == source_type)
+
+    questions = query.order_by(QuestionSurface.rank).limit(limit).all()
+
+    # If no real data, return demo questions
+    if not questions:
+        demo_questions = _generate_demo_questions(term.term)
+        return {
+            "term_id": term.id,
+            "term": term.term,
+            "count": len(demo_questions),
+            "questions": demo_questions,
+            "demo_mode": True,
+        }
+
+    return {
+        "term_id": term.id,
+        "term": term.term,
+        "count": len(questions),
+        "questions": [
+            {
+                "id": q.id,
+                "question": q.question,
+                "snippet": q.snippet,
+                "source_title": q.source_title,
+                "source_url": q.source_url,
+                "source_type": q.source_type,
+                "rank": q.rank,
+            }
+            for q in questions
+        ],
+        "demo_mode": False,
+    }
+
+
+def _generate_demo_questions(term: str) -> list[dict]:
+    """Generate realistic demo PAA questions for a term when no real data exists."""
+    templates = [
+        "What is {term}?",
+        "What are the symptoms of {term}?",
+        "How is {term} diagnosed?",
+        "What are the treatment options for {term}?",
+        "Is {term} hereditary?",
+        "What is the survival rate for {term}?",
+        "Where can I find a specialist for {term}?",
+        "Is {term} covered by insurance?",
+        "What are the side effects of {term} treatment?",
+        "How do I cope with a {term} diagnosis?",
+    ]
+
+    return [
+        {
+            "id": i + 1,
+            "question": tpl.format(term=term),
+            "snippet": None,
+            "source_title": None,
+            "source_url": None,
+            "source_type": "people_also_ask",
+            "rank": i + 1,
+        }
+        for i, tpl in enumerate(templates)
     ]

@@ -18,7 +18,7 @@ from typing import Optional
 import numpy as np
 from sqlalchemy.orm import Session
 
-from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery, HourlyPattern
+from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery, HourlyPattern, QuestionSurface
 from pipeline.taxonomy import get_seed_terms, TaxonomyTerm
 from pipeline.trends_fetcher import (
     TrendsFetcher,
@@ -28,6 +28,7 @@ from pipeline.trends_fetcher import (
     transform_related_topics,
     aggregate_hourly_patterns,
 )
+from pipeline.question_fetcher import QuestionFetcher
 from pipeline.embeddings import EmbeddingGenerator, compute_centroid
 from pipeline.clustering import ClusteringPipeline, get_cluster_color, generate_cluster_name
 from pipeline.sdoh_loader import SDOHLoader, STATE_CENTROIDS
@@ -46,6 +47,7 @@ class PipelineOrchestrator:
     def __init__(self, db: Session):
         self.db = db
         self.trends_fetcher = TrendsFetcher()
+        self.question_fetcher = QuestionFetcher()
         self.embedding_generator = EmbeddingGenerator()
         self.clustering_pipeline = ClusteringPipeline()
         self.sdoh_loader = SDOHLoader()
@@ -104,13 +106,18 @@ class PipelineOrchestrator:
                     logger.info("Step 5c: Re-clustering with discovered terms...")
                     await self._cluster_terms()
 
-            # Step 6: Fetch hourly patterns for vulnerability window
+            # Step 6: Fetch People Also Ask questions (Question Surface)
             if fetch_trends:
-                logger.info("Step 6: Fetching hourly patterns (vulnerability window)...")
+                logger.info("Step 6: Fetching People Also Ask questions (Question Surface)...")
+                await self._fetch_questions()
+
+            # Step 7: Fetch hourly patterns for vulnerability window
+            if fetch_trends:
+                logger.info("Step 7: Fetching hourly patterns (vulnerability window)...")
                 await self._fetch_hourly_patterns(geo)
 
-            # Step 7: Load SDOH data
-            logger.info("Step 7: Loading SDOH data...")
+            # Step 8: Load SDOH data
+            logger.info("Step 8: Loading SDOH data...")
             await self._load_sdoh_data()
 
             # Complete
@@ -476,6 +483,57 @@ class PipelineOrchestrator:
 
         self.db.commit()
         logger.info(f"Stored hourly patterns for {patterns_stored}/{total} terms")
+
+    async def _fetch_questions(self) -> None:
+        """
+        Fetch People Also Ask questions and autocomplete questions for all terms.
+
+        This creates the 'Question Surface' — the literal human phrasing of questions
+        around each oncology term. These are the 2am questions, the scared-parent
+        questions, the questions that reveal intent behind the search terms.
+        """
+        terms = self.db.query(SearchTerm).all()
+        total = len(terms)
+
+        # Clear old question data
+        self.db.query(QuestionSurface).delete()
+        self.db.commit()
+
+        questions_stored = 0
+
+        for i, term in enumerate(terms):
+            logger.info(f"Fetching questions {i + 1}/{total}: {term.term}")
+
+            try:
+                result = self.question_fetcher.fetch_all_questions(
+                    term.term,
+                    paa_pages=2,
+                    max_prefixes=5,
+                )
+
+                for q in result.questions:
+                    question = QuestionSurface(
+                        source_term_id=term.id,
+                        question=q.question,
+                        snippet=q.snippet,
+                        source_title=q.source_title,
+                        source_url=q.source_url,
+                        source_type=q.source_type,
+                        rank=q.rank,
+                    )
+                    self.db.add(question)
+                    questions_stored += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to fetch questions for '{term.term}': {e}")
+
+            # Commit every 10 terms
+            if (i + 1) % 10 == 0:
+                self.db.commit()
+                logger.info(f"Committed questions batch {i + 1}/{total}")
+
+        self.db.commit()
+        logger.info(f"Stored {questions_stored} questions for {total} terms")
 
     async def _load_sdoh_data(self) -> None:
         """Load SDOH data and update geographic regions."""

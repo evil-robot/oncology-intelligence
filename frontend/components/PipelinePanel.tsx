@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Play, RefreshCw, CheckCircle, XCircle, Clock, Database, TrendingUp, MapPin, Loader2, Sparkles } from 'lucide-react'
+import { Play, RefreshCw, CheckCircle, XCircle, Clock, Database, TrendingUp, MapPin, Loader2, Sparkles, HelpCircle } from 'lucide-react'
 
 interface PipelineStats {
   terms: number
@@ -12,6 +12,7 @@ interface PipelineStats {
   regions_with_sdoh: number
   related_queries: number
   discovered_terms: number
+  questions: number
 }
 
 interface PipelineRun {
@@ -211,15 +212,19 @@ export default function PipelinePanel() {
             </div>
           </div>
           {/* Secondary stats row */}
-          {(stats.related_queries > 0 || stats.discovered_terms > 0) && (
-            <div className="grid grid-cols-2 gap-2 text-xs">
+          {(stats.related_queries > 0 || stats.discovered_terms > 0 || stats.questions > 0) && (
+            <div className="grid grid-cols-3 gap-2 text-xs">
               <div className="bg-surface rounded-lg p-2 text-center">
                 <div className="text-lg font-semibold text-purple-400">{stats.related_queries.toLocaleString()}</div>
                 <div className="text-gray-500">Related Queries</div>
               </div>
               <div className="bg-surface rounded-lg p-2 text-center">
                 <div className="text-lg font-semibold text-yellow-400">{stats.discovered_terms}</div>
-                <div className="text-gray-500">Discovered Terms</div>
+                <div className="text-gray-500">Discovered</div>
+              </div>
+              <div className="bg-surface rounded-lg p-2 text-center">
+                <div className="text-lg font-semibold text-cyan-400">{stats.questions.toLocaleString()}</div>
+                <div className="text-gray-500">Questions</div>
               </div>
             </div>
           )}
@@ -337,8 +342,8 @@ export default function PipelinePanel() {
 
       {/* Info */}
       <p className="text-[10px] text-gray-500 text-center">
-        Fetches 5-year trends, hourly patterns, related queries & topics via SerpAPI for all {stats?.terms || '~300'} terms.
-        Auto-discovers emerging terms. Reveals late-night anxiety search windows.
+        Fetches 5-year trends, hourly patterns, related queries, topics & People Also Ask questions via SerpAPI for all {stats?.terms || '~300'} terms.
+        Auto-discovers emerging terms. Surfaces the actual human questions behind each search.
       </p>
     </div>
   )

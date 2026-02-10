@@ -118,6 +118,24 @@ export interface Insight {
   demo_mode?: boolean
 }
 
+export interface QuestionData {
+  id: number
+  question: string
+  snippet?: string
+  source_title?: string
+  source_url?: string
+  source_type: string
+  rank: number
+}
+
+export interface TermQuestionsResponse {
+  term_id: number
+  term: string
+  count: number
+  questions: QuestionData[]
+  demo_mode: boolean
+}
+
 export interface DataSource {
   id: number
   geo_code: string
@@ -188,6 +206,7 @@ export const api = {
   },
   getTaxonomy: () => fetchApi<{ categories: TaxonomyCategory[]; total_terms: number }>('/api/terms/taxonomy'),
   getSimilarTerms: (id: number) => fetchApi<Term[]>(`/api/terms/${id}/similar`),
+  getTermQuestions: (id: number) => fetchApi<TermQuestionsResponse>(`/api/terms/${id}/questions`),
 
   // Trends
   getTermTrends: (termId: number, geo?: string) => {

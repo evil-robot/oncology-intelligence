@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, TrendingUp, MapPin, ExternalLink, Sparkles } from 'lucide-react'
+import { X, TrendingUp, MapPin, ExternalLink, Sparkles, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useStore, useSelection } from '@/lib/store'
-import api, { TrendPoint, Term, RegionData } from '@/lib/api'
+import api, { TrendPoint, Term, RegionData, QuestionData } from '@/lib/api'
 
 interface TopRegion {
   name: string
@@ -21,6 +21,8 @@ export default function DetailPanel() {
   const [trendData, setTrendData] = useState<TrendPoint[]>([])
   const [similarTerms, setSimilarTerms] = useState<Term[]>([])
   const [topRegions, setTopRegions] = useState<TopRegion[]>([])
+  const [questions, setQuestions] = useState<QuestionData[]>([])
+  const [questionsExpanded, setQuestionsExpanded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   const selected = selection.selectedTerm || selection.selectedCluster
@@ -30,6 +32,7 @@ export default function DetailPanel() {
       setTrendData([])
       setSimilarTerms([])
       setTopRegions([])
+      setQuestions([])
       return
     }
 
@@ -38,13 +41,15 @@ export default function DetailPanel() {
     const fetchData = async () => {
       try {
         if (selection.selectedTerm) {
-          const [trends, similar, regions] = await Promise.all([
+          const [trends, similar, regions, questionResponse] = await Promise.all([
             api.getTermTrends(selection.selectedTerm.id, filters.geoCode),
             api.getSimilarTerms(selection.selectedTerm.id),
             api.getHeatmapData({ termId: selection.selectedTerm.id }),
+            api.getTermQuestions(selection.selectedTerm.id),
           ])
           setTrendData(trends.data)
           setSimilarTerms(similar)
+          setQuestions(questionResponse.questions || [])
           // Sort by interest and take top 5
           const sortedRegions = regions
             .filter((r: RegionData) => r.interest > 0)
@@ -210,6 +215,58 @@ export default function DetailPanel() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* People Also Ask */}
+      {!isCluster && questions.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setQuestionsExpanded(!questionsExpanded)}
+            className="flex items-center justify-between w-full text-sm text-gray-400 hover:text-gray-300 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4" />
+              <span>People Also Ask</span>
+              <span className="text-xs text-gray-600">({questions.length})</span>
+            </div>
+            {questionsExpanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+
+          {questionsExpanded && (
+            <div className="space-y-2">
+              {questions.slice(0, 10).map((q) => (
+                <div
+                  key={q.id}
+                  className="bg-surface rounded-lg p-3 space-y-1"
+                >
+                  <p className="text-sm font-medium text-gray-200">
+                    {q.question}
+                  </p>
+                  {q.snippet && (
+                    <p className="text-xs text-gray-500 line-clamp-2">
+                      {q.snippet}
+                    </p>
+                  )}
+                  {q.source_url && (
+                    <a
+                      href={q.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      {q.source_title || 'Source'}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
