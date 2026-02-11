@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 0.9.5-alpha |
+| Version | 0.9.6-alpha |
 | Last Updated | February 11, 2026 |
 | Repository | oncology-intelligence |
 | Deployment | Railway.app (frontend + backend), Neon (database) |
@@ -22,6 +22,7 @@
 | 0.9.3 | Feb 2026 | Cluster explainability, geo dedup, N+1 query fixes |
 | 0.9.4 | Feb 11, 2026 | Story Builder, Google Sheets sprint integration, full functional spec rewrite |
 | 0.9.5 | Feb 11, 2026 | Category-aware embedding context for better cross-domain cluster separation |
+| 0.9.6 | Feb 11, 2026 | QA pass: fix HTTPException returns, null dereferences, pipeline rollback, taxonomy dedup, frontend crash bugs |
 
 ---
 
