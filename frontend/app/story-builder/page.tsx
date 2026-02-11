@@ -148,11 +148,23 @@ export default function StoryBuilderPage() {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
+  const fallbackContext: SheetContext = { epics: [], sprints: [], features: [], assignees: ['JAS Bots', 'Dustin', 'JAS'] }
+
   useEffect(() => {
     fetch(`${API_URL}/api/stories/context`)
-      .then(r => r.json())
-      .then(setContext)
-      .catch(() => setContext({ epics: [], sprints: [], features: [], assignees: ['JAS Bots', 'Dustin', 'JAS'] }))
+      .then(r => {
+        if (!r.ok) throw new Error(`Context API returned ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        // Validate shape — API errors return {detail: "..."} which would crash later
+        if (data && Array.isArray(data.epics)) {
+          setContext(data)
+        } else {
+          setContext(fallbackContext)
+        }
+      })
+      .catch(() => setContext(fallbackContext))
   }, [])
 
   const callAssist = async (stepKey: string, inputText: string) => {
@@ -381,7 +393,7 @@ export default function StoryBuilderPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Sprint" value={draft.sprint} onChange={(v) => setDraft(d => ({ ...d, sprint: v }))}
-                    options={context?.sprints.map(s => s.id) || []} placeholder="e.g., 2026-S1" />
+                    options={context?.sprints?.map(s => s.id) || []} placeholder="e.g., 2026-S1" />
                   <Field label="Assigned To" value={draft.assigned_to} onChange={(v) => setDraft(d => ({ ...d, assigned_to: v }))}
                     options={context?.assignees || []} placeholder="Who's building this?" />
                 </div>

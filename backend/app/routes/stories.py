@@ -146,7 +146,7 @@ async def assist_story(request: AssistRequest):
         return _fallback_assist(request)
 
     prompts = {
-        "idea": """You are a product manager helping write user stories for VIOLET, a pediatric oncology search intelligence platform.
+        "idea": """You are a product manager helping write user stories for VIOLET, an oncology & rare disease search intelligence platform.
 
 The user has a rough idea. Help them refine it into:
 1. A clear Epic name (the broad capability area)
