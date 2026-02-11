@@ -6,12 +6,15 @@ Used by the Story Builder web app for sprint planning.
 import os
 import json
 import base64
+import logging
 import tempfile
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
 from ..config import get_settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/stories", tags=["stories"])
 
@@ -40,17 +43,28 @@ def get_sheets_service():
 
         scopes = ['https://www.googleapis.com/auth/spreadsheets']
 
-        if GOOGLE_SA_JSON_B64:
-            # Decode base64 credentials from env var (Railway/cloud)
-            sa_json = base64.b64decode(GOOGLE_SA_JSON_B64)
+        # Check env var at call time (not just import time) in case it was set late
+        b64_creds = GOOGLE_SA_JSON_B64 or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_B64", "")
+
+        if b64_creds:
+            logger.info("Using base64 service account credentials (len=%d)", len(b64_creds))
+            sa_json = base64.b64decode(b64_creds)
             sa_info = json.loads(sa_json)
             creds = service_account.Credentials.from_service_account_info(sa_info, scopes=scopes)
-        else:
-            # Read from file (local dev)
+        elif os.path.exists(SERVICE_ACCOUNT_PATH):
+            logger.info("Using service account file: %s", SERVICE_ACCOUNT_PATH)
             creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=scopes)
+        else:
+            raise RuntimeError(
+                f"No Google Sheets credentials found. "
+                f"Set GOOGLE_SERVICE_ACCOUNT_JSON_B64 env var or provide file at {SERVICE_ACCOUNT_PATH}"
+            )
 
         return build('sheets', 'v4', credentials=creds)
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error("Google Sheets connection failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Google Sheets connection failed: {e}")
 
 
