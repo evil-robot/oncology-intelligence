@@ -465,10 +465,11 @@ function AutoPilot({ enabled, terms }: { enabled: boolean; terms: Term[] }) {
     // Start with a dramatic pullback view
     waypoints.push(new THREE.Vector3(center.x, center.y + 3, center.z + 12))
 
-    // Dive into the data - pick 8-12 points to fly between
-    const numWaypoints = Math.min(12, Math.max(8, Math.floor(terms.length / 10)))
+    // Dive into the data - pick points to fly between (capped to actual term count)
+    const numWaypoints = Math.min(shuffled.length, 12, Math.max(8, Math.floor(terms.length / 10)))
     for (let i = 0; i < numWaypoints; i++) {
       const term = shuffled[i]
+      if (!term) continue
       // Position camera close to data point, slightly offset for drama
       const offset = new THREE.Vector3(
         (Math.random() - 0.5) * 1.5,
