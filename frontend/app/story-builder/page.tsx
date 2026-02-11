@@ -209,7 +209,11 @@ export default function StoryBuilderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       })
-      if (!res.ok) throw new Error('Failed to submit')
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null)
+        const detail = errBody?.detail || `Server error (${res.status})`
+        throw new Error(detail)
+      }
       setSubmitStatus('done')
     } catch (e) {
       setSubmitStatus('error')
