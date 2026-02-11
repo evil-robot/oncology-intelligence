@@ -189,22 +189,27 @@ def seed_taxonomy():
 
     db = SessionLocal()
     try:
-        # Check if taxonomy is already loaded (terms with coordinates exist)
-        existing_count = db.query(SearchTerm).filter(
-            SearchTerm.x.isnot(None)
-        ).count()
-        if existing_count > 0:
-            # Taxonomy already seeded — but check for new terms added since last seed
-            all_seed_terms = get_seed_terms()
-            existing_terms = {t.term for t in db.query(SearchTerm.term).all()}
-            new_terms = [t for t in all_seed_terms if t.term not in existing_terms]
-            if not new_terms:
-                return  # Everything up to date
+        # Get all seed terms from taxonomy
+        all_seed_terms = get_seed_terms()
+        seed_term_lookup = {t.term: t for t in all_seed_terms}
 
+        # Find existing terms in DB
+        existing_db_terms = db.query(SearchTerm).all()
+        existing_term_names = {t.term for t in existing_db_terms}
+
+        # Find terms that need NEW creation (not in DB at all)
+        new_terms = [t for t in all_seed_terms if t.term not in existing_term_names]
+
+        # Find existing terms that are MISSING coordinates (need backfill)
+        orphan_terms = [t for t in existing_db_terms if t.x is None or t.y is None or t.z is None]
+
+        if not new_terms and not orphan_terms:
+            return  # Everything up to date
+
+        if new_terms:
             print(f"Found {len(new_terms)} new taxonomy terms to seed")
-        else:
-            new_terms = get_seed_terms()
-            print(f"Seeding {len(new_terms)} taxonomy terms with synthetic coordinates")
+        if orphan_terms:
+            print(f"Found {len(orphan_terms)} existing terms missing coordinates — backfilling")
 
         # Category → base position in 3D space (spread categories across the scene)
         category_positions = {
@@ -301,6 +306,32 @@ def seed_taxonomy():
             db.add(db_term)
             added += 1
 
+        # Backfill coordinates on existing terms that are missing them
+        backfilled = 0
+        for db_term in orphan_terms:
+            # Use category from the term itself, or look it up in the seed taxonomy
+            category = db_term.category
+            if not category and db_term.term in seed_term_lookup:
+                category = seed_term_lookup[db_term.term].category
+                db_term.category = category
+            if not category:
+                category = "emerging"  # fallback category
+
+            h = hashlib.md5(db_term.term.encode()).hexdigest()
+            dx = (int(h[0:4], 16) / 65535.0 - 0.5) * 2.0
+            dy = (int(h[4:8], 16) / 65535.0 - 0.5) * 2.0
+            dz = (int(h[8:12], 16) / 65535.0 - 0.5) * 2.0
+
+            base = category_positions.get(category, (0, 0, 0))
+            cluster = category_cluster_map.get(category)
+
+            db_term.x = base[0] + dx
+            db_term.y = base[1] + dy
+            db_term.z = base[2] + dz
+            if cluster and not db_term.cluster_id:
+                db_term.cluster_id = cluster.id
+            backfilled += 1
+
         # Update cluster term counts
         for category, cluster in category_cluster_map.items():
             count = db.query(SearchTerm).filter(
@@ -309,7 +340,10 @@ def seed_taxonomy():
             cluster.term_count = count
 
         db.commit()
-        print(f"Seeded {added} taxonomy terms into search_terms with synthetic 3D coordinates")
+        if added:
+            print(f"Seeded {added} new taxonomy terms with synthetic 3D coordinates")
+        if backfilled:
+            print(f"Backfilled coordinates on {backfilled} existing terms")
     except Exception as e:
         print(f"Error seeding taxonomy: {e}")
         db.rollback()
