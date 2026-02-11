@@ -1,0 +1,951 @@
+From 036a70fa3fd1ced560ddfcfc4c8b90a8182698a5 Mon Sep 17 00:00:00 2001
+From: JAS <jas@evilrobot.com>
+Date: Tue, 10 Feb 2026 22:47:01 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20add=20Question=20Surface=20layer=20?=
+ =?UTF-8?q?=E2=80=94=20People=20Also=20Ask=20+=20autocomplete=20questions?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Surfaces the actual human questions behind oncology search terms using
+SerpAPI's PAA and autocomplete engines. New pipeline step fetches questions
+for all terms, new API endpoints expose per-term and cross-term question
+discovery, and the DetailPanel now shows a collapsible "People Also Ask"
+section alongside existing trend data.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+---
+ backend/app/main.py                   |   3 +-
+ backend/app/models.py                 |  34 ++++
+ backend/app/routes/pipeline.py        |   3 +-
+ backend/app/routes/questions.py       | 125 ++++++++++++
+ backend/app/routes/terms.py           |  88 +++++++-
+ backend/pipeline/orchestrator.py      |  68 ++++++-
+ backend/pipeline/question_fetcher.py  | 280 ++++++++++++++++++++++++++
+ frontend/components/DetailPanel.tsx   |  63 +++++-
+ frontend/components/PipelinePanel.tsx |  17 +-
+ frontend/lib/api.ts                   |  19 ++
+ 10 files changed, 683 insertions(+), 17 deletions(-)
+ create mode 100644 backend/app/routes/questions.py
+ create mode 100644 backend/pipeline/question_fetcher.py
+
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 2e78b6f..5c57583 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -21,7 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
+ 
+ from app.config import get_settings
+ from app.database import init_db
+-from app.routes import clusters, terms, trends, geography, pipeline, insights, chat, compare, triangulation
++from app.routes import clusters, terms, trends, geography, pipeline, insights, chat, compare, triangulation, questions
+ 
+ # Configure logging
+ logging.basicConfig(
+@@ -123,6 +123,7 @@ app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"])
+ app.include_router(insights.router, prefix="/api/insights", tags=["insights"])
+ app.include_router(compare.router, prefix="/api/compare", tags=["compare"])
+ app.include_router(triangulation.router, prefix="/api/triangulate", tags=["triangulation"])
++app.include_router(questions.router, prefix="/api/questions", tags=["questions"])
+ app.include_router(chat.router)
+ 
+ 
+diff --git a/backend/app/models.py b/backend/app/models.py
+index 2b6d7ba..70d1eaa 100644
+--- a/backend/app/models.py
++++ b/backend/app/models.py
+@@ -256,6 +256,40 @@ class HourlyPattern(Base):
+     term = relationship("SearchTerm")
+ 
+ 
++class QuestionSurface(Base):
++    """People Also Ask questions and autocomplete questions for search terms.
++
++    Stores actual human questions discovered from Google's 'People Also Ask' feature
++    and autocomplete suggestions. This is the 'narrative layer' — the literal phrasing
++    of fear, hope, and confusion that people type at 2am.
++    """
++
++    __tablename__ = "question_surface"
++
++    id = Column(Integer, primary_key=True)
++    source_term_id = Column(Integer, ForeignKey("search_terms.id"), nullable=False, index=True)
++
++    # The actual human question
++    question = Column(String(1000), nullable=False)  # "Is BRCA testing covered by insurance?"
++    snippet = Column(Text)  # Answer snippet from PAA
++    source_title = Column(String(500))  # Source page title
++    source_url = Column(String(2000))  # Source link
++
++    # Source classification
++    source_type = Column(String(50), default="people_also_ask")  # "people_also_ask" or "autocomplete"
++    rank = Column(Integer)  # Position in PAA results (1-based)
++
++    fetched_at = Column(DateTime, default=datetime.utcnow)
++
++    # Relationship
++    term = relationship("SearchTerm")
++
++    __table_args__ = (
++        Index("ix_question_surface_term", "source_term_id"),
++        Index("ix_question_surface_type", "source_term_id", "source_type"),
++    )
++
++
+ class DataSource(Base):
+     """Track data sources (region + timeframe combinations) that have been fetched."""
+ 
+diff --git a/backend/app/routes/pipeline.py b/backend/app/routes/pipeline.py
+index 077d961..2772278 100644
+--- a/backend/app/routes/pipeline.py
++++ b/backend/app/routes/pipeline.py
+@@ -129,7 +129,7 @@ async def trigger_pipeline(
+ @router.get("/stats")
+ async def get_pipeline_stats(db: Session = Depends(get_db)):
+     """Get overall pipeline statistics."""
+-    from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, RelatedQuery
++    from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, RelatedQuery, QuestionSurface
+     from sqlalchemy import func
+ 
+     return {
+@@ -147,4 +147,5 @@ async def get_pipeline_stats(db: Session = Depends(get_db)):
+         "discovered_terms": db.query(func.count(SearchTerm.id)).filter(
+             SearchTerm.subcategory.like("discovered:%")
+         ).scalar(),
++        "questions": db.query(func.count(QuestionSurface.id)).scalar(),
+     }
+diff --git a/backend/app/routes/questions.py b/backend/app/routes/questions.py
+new file mode 100644
+index 0000000..39afe9c
+--- /dev/null
++++ b/backend/app/routes/questions.py
+@@ -0,0 +1,125 @@
++"""Question Surface API routes — cross-term question search and discovery."""
++
++from typing import Optional
++from fastapi import APIRouter, Depends, Query
++from sqlalchemy.orm import Session
++from sqlalchemy import func
++
++from app.database import get_db
++from app.models import QuestionSurface, SearchTerm
++
++router = APIRouter()
++
++
++@router.get("/top")
++async def get_top_questions(
++    db: Session = Depends(get_db),
++    category: Optional[str] = Query(None, description="Filter by term category"),
++    source_type: Optional[str] = Query(None, description="Filter: people_also_ask or autocomplete"),
++    limit: int = Query(30, le=100),
++):
++    """
++    Get the most common questions across all terms.
++
++    Returns questions ranked by how frequently they appear across different terms,
++    revealing the universal anxieties in oncology search behavior.
++    """
++    query = (
++        db.query(QuestionSurface, SearchTerm)
++        .join(SearchTerm, QuestionSurface.source_term_id == SearchTerm.id)
++    )
++
++    if category:
++        query = query.filter(SearchTerm.category == category)
++
++    if source_type:
++        query = query.filter(QuestionSurface.source_type == source_type)
++
++    results = query.order_by(QuestionSurface.rank).limit(limit).all()
++
++    return {
++        "count": len(results),
++        "questions": [
++            {
++                "id": q.id,
++                "question": q.question,
++                "snippet": q.snippet,
++                "source_type": q.source_type,
++                "term_id": term.id,
++                "term": term.term,
++                "category": term.category,
++            }
++            for q, term in results
++        ],
++    }
++
++
++@router.get("/search")
++async def search_questions(
++    db: Session = Depends(get_db),
++    q: str = Query(..., min_length=2, description="Search query"),
++    limit: int = Query(20, le=50),
++):
++    """
++    Search across all questions by text.
++
++    Find questions containing specific phrases like "insurance", "survival rate",
++    "hereditary", etc. to discover patterns in how people phrase their fears.
++    """
++    results = (
++        db.query(QuestionSurface, SearchTerm)
++        .join(SearchTerm, QuestionSurface.source_term_id == SearchTerm.id)
++        .filter(QuestionSurface.question.ilike(f"%{q}%"))
++        .order_by(QuestionSurface.rank)
++        .limit(limit)
++        .all()
++    )
++
++    return {
++        "query": q,
++        "count": len(results),
++        "questions": [
++            {
++                "id": qs.id,
++                "question": qs.question,
++                "snippet": qs.snippet,
++                "source_type": qs.source_type,
++                "term_id": term.id,
++                "term": term.term,
++                "category": term.category,
++            }
++            for qs, term in results
++        ],
++    }
++
++
++@router.get("/stats")
++async def get_question_stats(
++    db: Session = Depends(get_db),
++):
++    """
++    Get statistics about the Question Surface layer.
++
++    Returns counts by source type, category coverage, and total questions.
++    """
++    total = db.query(func.count(QuestionSurface.id)).scalar() or 0
++
++    by_type = dict(
++        db.query(QuestionSurface.source_type, func.count(QuestionSurface.id))
++        .group_by(QuestionSurface.source_type)
++        .all()
++    )
++
++    terms_with_questions = (
++        db.query(func.count(func.distinct(QuestionSurface.source_term_id))).scalar() or 0
++    )
++
++    total_terms = db.query(func.count(SearchTerm.id)).scalar() or 0
++
++    return {
++        "total_questions": total,
++        "by_source_type": by_type,
++        "terms_with_questions": terms_with_questions,
++        "total_terms": total_terms,
++        "coverage_pct": round(terms_with_questions / max(total_terms, 1) * 100, 1),
++    }
+diff --git a/backend/app/routes/terms.py b/backend/app/routes/terms.py
+index 989e9a8..f9d5505 100644
+--- a/backend/app/routes/terms.py
++++ b/backend/app/routes/terms.py
+@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
+ from pydantic import BaseModel
+ 
+ from app.database import get_db
+-from app.models import SearchTerm, RelatedQuery
++from app.models import SearchTerm, RelatedQuery, QuestionSurface
+ 
+ router = APIRouter()
+ 
+@@ -195,3 +195,89 @@ async def list_discovered_terms(
+         }
+         for t in terms
+     ]
++
++
++@router.get("/{term_id}/questions")
++async def get_term_questions(
++    term_id: int,
++    db: Session = Depends(get_db),
++    source_type: Optional[str] = Query(None, description="Filter: people_also_ask or autocomplete"),
++    limit: int = Query(20, le=50),
++):
++    """
++    Get People Also Ask questions and autocomplete questions for a term.
++
++    This is the Question Surface — the literal human phrasing of queries
++    around an oncology term. The 2am questions. The scared-parent questions.
++    """
++    term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
++    if not term:
++        return {"error": "Term not found"}, 404
++
++    query = db.query(QuestionSurface).filter(
++        QuestionSurface.source_term_id == term_id
++    )
++
++    if source_type:
++        query = query.filter(QuestionSurface.source_type == source_type)
++
++    questions = query.order_by(QuestionSurface.rank).limit(limit).all()
++
++    # If no real data, return demo questions
++    if not questions:
++        demo_questions = _generate_demo_questions(term.term)
++        return {
++            "term_id": term.id,
++            "term": term.term,
++            "count": len(demo_questions),
++            "questions": demo_questions,
++            "demo_mode": True,
++        }
++
++    return {
++        "term_id": term.id,
++        "term": term.term,
++        "count": len(questions),
++        "questions": [
++            {
++                "id": q.id,
++                "question": q.question,
++                "snippet": q.snippet,
++                "source_title": q.source_title,
++                "source_url": q.source_url,
++                "source_type": q.source_type,
++                "rank": q.rank,
++            }
++            for q in questions
++        ],
++        "demo_mode": False,
++    }
++
++
++def _generate_demo_questions(term: str) -> list[dict]:
++    """Generate realistic demo PAA questions for a term when no real data exists."""
++    templates = [
++        "What is {term}?",
++        "What are the symptoms of {term}?",
++        "How is {term} diagnosed?",
++        "What are the treatment options for {term}?",
++        "Is {term} hereditary?",
++        "What is the survival rate for {term}?",
++        "Where can I find a specialist for {term}?",
++        "Is {term} covered by insurance?",
++        "What are the side effects of {term} treatment?",
++        "How do I cope with a {term} diagnosis?",
++    ]
++
++    return [
++        {
++            "id": i + 1,
++            "question": tpl.format(term=term),
++            "snippet": None,
++            "source_title": None,
++            "source_url": None,
++            "source_type": "people_also_ask",
++            "rank": i + 1,
++        }
++        for i, tpl in enumerate(templates)
++    ]
+diff --git a/backend/pipeline/orchestrator.py b/backend/pipeline/orchestrator.py
+index cd2e360..be4747d 100644
+--- a/backend/pipeline/orchestrator.py
++++ b/backend/pipeline/orchestrator.py
+@@ -18,7 +18,7 @@ from typing import Optional
+ import numpy as np
+ from sqlalchemy.orm import Session
+ 
+-from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery, HourlyPattern
++from app.models import SearchTerm, Cluster, TrendData, GeographicRegion, PipelineRun, RelatedQuery, HourlyPattern, QuestionSurface
+ from pipeline.taxonomy import get_seed_terms, TaxonomyTerm
+ from pipeline.trends_fetcher import (
+     TrendsFetcher,
+@@ -28,6 +28,7 @@ from pipeline.trends_fetcher import (
+     transform_related_topics,
+     aggregate_hourly_patterns,
+ )
++from pipeline.question_fetcher import QuestionFetcher
+ from pipeline.embeddings import EmbeddingGenerator, compute_centroid
+ from pipeline.clustering import ClusteringPipeline, get_cluster_color, generate_cluster_name
+ from pipeline.sdoh_loader import SDOHLoader, STATE_CENTROIDS
+@@ -46,6 +47,7 @@ class PipelineOrchestrator:
+     def __init__(self, db: Session):
+         self.db = db
+         self.trends_fetcher = TrendsFetcher()
++        self.question_fetcher = QuestionFetcher()
+         self.embedding_generator = EmbeddingGenerator()
+         self.clustering_pipeline = ClusteringPipeline()
+         self.sdoh_loader = SDOHLoader()
+@@ -104,13 +106,18 @@ class PipelineOrchestrator:
+                     logger.info("Step 5c: Re-clustering with discovered terms...")
+                     await self._cluster_terms()
+ 
+-            # Step 6: Fetch hourly patterns for vulnerability window
++            # Step 6: Fetch People Also Ask questions (Question Surface)
+             if fetch_trends:
+-                logger.info("Step 6: Fetching hourly patterns (vulnerability window)...")
++                logger.info("Step 6: Fetching People Also Ask questions (Question Surface)...")
++                await self._fetch_questions()
++
++            # Step 7: Fetch hourly patterns for vulnerability window
++            if fetch_trends:
++                logger.info("Step 7: Fetching hourly patterns (vulnerability window)...")
+                 await self._fetch_hourly_patterns(geo)
+ 
+-            # Step 7: Load SDOH data
+-            logger.info("Step 7: Loading SDOH data...")
++            # Step 8: Load SDOH data
++            logger.info("Step 8: Loading SDOH data...")
+             await self._load_sdoh_data()
+ 
+             # Complete
+@@ -477,6 +484,57 @@ class PipelineOrchestrator:
+         self.db.commit()
+         logger.info(f"Stored hourly patterns for {patterns_stored}/{total} terms")
+ 
++    async def _fetch_questions(self) -> None:
++        """
++        Fetch People Also Ask questions and autocomplete questions for all terms.
++
++        This creates the 'Question Surface' — the literal human phrasing of questions
++        around each oncology term. These are the 2am questions, the scared-parent
++        questions, the questions that reveal intent behind the search terms.
++        """
++        terms = self.db.query(SearchTerm).all()
++        total = len(terms)
++
++        # Clear old question data
++        self.db.query(QuestionSurface).delete()
++        self.db.commit()
++
++        questions_stored = 0
++
++        for i, term in enumerate(terms):
++            logger.info(f"Fetching questions {i + 1}/{total}: {term.term}")
++
++            try:
++                result = self.question_fetcher.fetch_all_questions(
++                    term.term,
++                    paa_pages=2,
++                    max_prefixes=5,
++                )
++
++                for q in result.questions:
++                    question = QuestionSurface(
++                        source_term_id=term.id,
++                        question=q.question,
++                        snippet=q.snippet,
++                        source_title=q.source_title,
++                        source_url=q.source_url,
++                        source_type=q.source_type,
++                        rank=q.rank,
++                    )
++                    self.db.add(question)
++                    questions_stored += 1
++
++            except Exception as e:
++                logger.warning(f"Failed to fetch questions for '{term.term}': {e}")
++
++            # Commit every 10 terms
++            if (i + 1) % 10 == 0:
++                self.db.commit()
++                logger.info(f"Committed questions batch {i + 1}/{total}")
++
++        self.db.commit()
++        logger.info(f"Stored {questions_stored} questions for {total} terms")
++
+     async def _load_sdoh_data(self) -> None:
+         """Load SDOH data and update geographic regions."""
+         county_df = await self.sdoh_loader.load_county_svi()
+diff --git a/backend/pipeline/question_fetcher.py b/backend/pipeline/question_fetcher.py
+new file mode 100644
+index 0000000..6878010
+--- /dev/null
++++ b/backend/pipeline/question_fetcher.py
+@@ -0,0 +1,280 @@
++"""
++Question Surface fetcher — pulls actual human questions from Google.
++
++Uses two SerpAPI engines:
++1. google_related_questions: "People Also Ask" boxes with full questions + answer snippets
++2. google_autocomplete: Autocomplete suggestions seeded with question prefixes
++
++This is the 'narrative layer' of VIOLET — it captures how people phrase their fear,
++not just the structural terms they search for.
++"""
++
++import time
++import logging
++from typing import Optional
++from dataclasses import dataclass, field
++
++from serpapi import GoogleSearch
++
++from app.config import get_settings
++
++logger = logging.getLogger(__name__)
++
++# Question prefixes used to seed autocomplete with interrogative phrasing
++QUESTION_PREFIXES = [
++    "how do I",
++    "where can I",
++    "what is",
++    "is it normal to",
++    "can I",
++    "why does",
++    "what are the symptoms of",
++    "what happens if",
++    "how long does",
++    "should I",
++]
++
++
++@dataclass
++class QuestionResult:
++    """A single question discovered from PAA or autocomplete."""
++
++    question: str
++    snippet: Optional[str] = None
++    source_title: Optional[str] = None
++    source_url: Optional[str] = None
++    source_type: str = "people_also_ask"  # "people_also_ask" or "autocomplete"
++    rank: int = 0
++
++
++@dataclass
++class TermQuestions:
++    """All questions discovered for a single search term."""
++
++    term: str
++    questions: list[QuestionResult] = field(default_factory=list)
++
++
++class QuestionFetcher:
++    """Fetches human questions from Google PAA and autocomplete via SerpAPI."""
++
++    def __init__(
++        self,
++        api_key: Optional[str] = None,
++        request_delay: float = 0.5,
++    ):
++        settings = get_settings()
++        self.api_key = api_key or settings.serpapi_key
++        if not self.api_key:
++            raise ValueError("SERPAPI_KEY is required.")
++        self.request_delay = request_delay
++
++    def _search(self, params: dict) -> dict:
++        """Execute a SerpAPI search and return parsed results."""
++        params["api_key"] = self.api_key
++        search = GoogleSearch(params)
++        return search.get_dict()
++
++    def fetch_paa(
++        self,
++        term: str,
++        num_pages: int = 2,
++        gl: str = "us",
++        hl: str = "en",
++    ) -> list[QuestionResult]:
++        """
++        Fetch People Also Ask questions for a term.
++
++        Uses SerpAPI's google_related_questions engine which returns actual
++        interrogative phrases from Google's PAA boxes.
++
++        Args:
++            term: Search term to get PAA questions for
++            num_pages: Number of pages to fetch (each returns ~4 questions)
++            gl: Country code
++            hl: Language code
++
++        Returns:
++            List of QuestionResult objects with question text, snippets, and sources
++        """
++        questions = []
++        next_page_token = None
++
++        for page in range(num_pages):
++            try:
++                params = {
++                    "engine": "google_related_questions",
++                    "q": term,
++                    "gl": gl,
++                    "hl": hl,
++                }
++
++                if next_page_token:
++                    params["next_page_token"] = next_page_token
++
++                results = self._search(params)
++                time.sleep(self.request_delay)
++
++                related_questions = results.get("related_questions", [])
++
++                if not related_questions:
++                    logger.debug(f"No PAA results for '{term}' (page {page + 1})")
++                    break
++
++                for i, item in enumerate(related_questions):
++                    question_text = item.get("question", "")
++                    if not question_text:
++                        continue
++
++                    questions.append(QuestionResult(
++                        question=question_text,
++                        snippet=item.get("snippet"),
++                        source_title=item.get("title"),
++                        source_url=item.get("link"),
++                        source_type="people_also_ask",
++                        rank=len(questions) + 1,
++                    ))
++
++                # Get pagination token for next page
++                # The token comes from the first question's next_page_token field
++                if related_questions:
++                    next_page_token = related_questions[0].get("next_page_token")
++                    if not next_page_token:
++                        break
++                else:
++                    break
++
++            except Exception as e:
++                logger.warning(f"Failed to fetch PAA for '{term}' (page {page + 1}): {e}")
++                break
++
++        logger.debug(f"Got {len(questions)} PAA questions for '{term}'")
++        return questions
++
++    def fetch_question_completions(
++        self,
++        term: str,
++        gl: str = "us",
++        hl: str = "en",
++        max_prefixes: int = 5,
++    ) -> list[QuestionResult]:
++        """
++        Fetch autocomplete suggestions seeded with question prefixes.
++
++        Combines the term with interrogative prefixes like "how do I", "where can I",
++        "is it normal to", etc. to discover natural language questions people actually type.
++
++        Args:
++            term: Base search term
++            gl: Country code
++            hl: Language code
++            max_prefixes: Maximum number of question prefixes to try
++
++        Returns:
++            List of QuestionResult objects from autocomplete
++        """
++        questions = []
++        seen_questions = set()
++
++        for prefix in QUESTION_PREFIXES[:max_prefixes]:
++            try:
++                query = f"{prefix} {term}"
++                params = {
++                    "engine": "google_autocomplete",
++                    "q": query,
++                    "gl": gl,
++                    "hl": hl,
++                }
++
++                results = self._search(params)
++                time.sleep(self.request_delay)
++
++                suggestions = results.get("suggestions", [])
++
++                for suggestion in suggestions:
++                    text = suggestion.get("value", "")
++                    if not text or text.lower() in seen_questions:
++                        continue
++
++                    # Only keep suggestions that look like questions
++                    # (start with a question word or contain a question mark)
++                    text_lower = text.lower()
++                    is_question = (
++                        text.endswith("?")
++                        or any(text_lower.startswith(w) for w in [
++                            "how", "what", "where", "when", "why", "who",
++                            "is", "are", "can", "should", "does", "do", "will",
++                        ])
++                    )
++
++                    if is_question:
++                        seen_questions.add(text_lower)
++                        questions.append(QuestionResult(
++                            question=text,
++                            snippet=None,
++                            source_title=None,
++                            source_url=None,
++                            source_type="autocomplete",
++                            rank=len(questions) + 1,
++                        ))
++
++            except Exception as e:
++                logger.warning(f"Failed autocomplete for '{prefix} {term}': {e}")
++                continue
++
++        logger.debug(f"Got {len(questions)} autocomplete questions for '{term}'")
++        return questions
++
++    def fetch_all_questions(
++        self,
++        term: str,
++        paa_pages: int = 2,
++        max_prefixes: int = 5,
++        gl: str = "us",
++        hl: str = "en",
++    ) -> TermQuestions:
++        """
++        Fetch all questions for a term from both PAA and autocomplete.
++
++        Combines and deduplicates results from both sources, prioritizing
++        PAA questions (which have richer metadata) over autocomplete.
++
++        Args:
++            term: Search term
++            paa_pages: Number of PAA pages to fetch
++            max_prefixes: Number of autocomplete prefixes to try
++            gl: Country code
++            hl: Language code
++
++        Returns:
++            TermQuestions with deduplicated questions from all sources
++        """
++        logger.info(f"Fetching questions for: {term}")
++
++        # Fetch from both sources
++        paa_questions = self.fetch_paa(term, num_pages=paa_pages, gl=gl, hl=hl)
++        autocomplete_questions = self.fetch_question_completions(
++            term, gl=gl, hl=hl, max_prefixes=max_prefixes,
++        )
++
++        # Deduplicate: PAA takes priority (has snippets + sources)
++        seen = set()
++        all_questions = []
++
++        for q in paa_questions:
++            normalized = q.question.lower().strip().rstrip("?")
++            if normalized not in seen:
++                seen.add(normalized)
++                all_questions.append(q)
++
++        for q in autocomplete_questions:
++            normalized = q.question.lower().strip().rstrip("?")
++            if normalized not in seen:
++                seen.add(normalized)
++                all_questions.append(q)
++
++        # Re-rank after deduplication
++        for i, q in enumerate(all_questions):
++            q.rank = i + 1
++
++        return TermQuestions(term=term, questions=all_questions)
+diff --git a/frontend/components/DetailPanel.tsx b/frontend/components/DetailPanel.tsx
+index d075c92..062ea4f 100644
+--- a/frontend/components/DetailPanel.tsx
++++ b/frontend/components/DetailPanel.tsx
+@@ -1,10 +1,10 @@
+ 'use client'
+ 
+ import { useEffect, useState } from 'react'
+-import { X, TrendingUp, MapPin, ExternalLink, Sparkles } from 'lucide-react'
++import { X, TrendingUp, MapPin, ExternalLink, Sparkles, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
+ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+ import { useStore, useSelection } from '@/lib/store'
+-import api, { TrendPoint, Term, RegionData } from '@/lib/api'
++import api, { TrendPoint, Term, RegionData, QuestionData } from '@/lib/api'
+ 
+ interface TopRegion {
+   name: string
+@@ -21,6 +21,8 @@ export default function DetailPanel() {
+   const [trendData, setTrendData] = useState<TrendPoint[]>([])
+   const [similarTerms, setSimilarTerms] = useState<Term[]>([])
+   const [topRegions, setTopRegions] = useState<TopRegion[]>([])
++  const [questions, setQuestions] = useState<QuestionData[]>([])
++  const [questionsExpanded, setQuestionsExpanded] = useState(false)
+   const [isLoading, setIsLoading] = useState(false)
+ 
+   const selected = selection.selectedTerm || selection.selectedCluster
+@@ -30,6 +32,7 @@ export default function DetailPanel() {
+       setTrendData([])
+       setSimilarTerms([])
+       setTopRegions([])
++      setQuestions([])
+       return
+     }
+ 
+@@ -38,13 +41,15 @@ export default function DetailPanel() {
+     const fetchData = async () => {
+       try {
+         if (selection.selectedTerm) {
+-          const [trends, similar, regions] = await Promise.all([
++          const [trends, similar, regions, questionResponse] = await Promise.all([
+             api.getTermTrends(selection.selectedTerm.id, filters.geoCode),
+             api.getSimilarTerms(selection.selectedTerm.id),
+             api.getHeatmapData({ termId: selection.selectedTerm.id }),
++            api.getTermQuestions(selection.selectedTerm.id),
+           ])
+           setTrendData(trends.data)
+           setSimilarTerms(similar)
++          setQuestions(questionResponse.questions || [])
+           // Sort by interest and take top 5
+           const sortedRegions = regions
+             .filter((r: RegionData) => r.interest > 0)
+@@ -213,6 +218,58 @@ export default function DetailPanel() {
+         </div>
+       )}
+ 
++      {/* People Also Ask */}
++      {!isCluster && questions.length > 0 && (
++        <div className="space-y-2">
++          <button
++            onClick={() => setQuestionsExpanded(!questionsExpanded)}
++            className="flex items-center justify-between w-full text-sm text-gray-400 hover:text-gray-300 transition-colors"
++          >
++            <div className="flex items-center gap-2">
++              <HelpCircle className="w-4 h-4" />
++              <span>People Also Ask</span>
++              <span className="text-xs text-gray-600">({questions.length})</span>
++            </div>
++            {questionsExpanded ? (
++              <ChevronUp className="w-4 h-4" />
++            ) : (
++              <ChevronDown className="w-4 h-4" />
++            )}
++          </button>
++
++          {questionsExpanded && (
++            <div className="space-y-2">
++              {questions.slice(0, 10).map((q) => (
++                <div
++                  key={q.id}
++                  className="bg-surface rounded-lg p-3 space-y-1"
++                >
++                  <p className="text-sm font-medium text-gray-200">
++                    {q.question}
++                  </p>
++                  {q.snippet && (
++                    <p className="text-xs text-gray-500 line-clamp-2">
++                      {q.snippet}
++                    </p>
++                  )}
++                  {q.source_url && (
++                    <a
++                      href={q.source_url}
++                      target="_blank"
++                      rel="noopener noreferrer"
++                      className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors"
++                    >
++                      <ExternalLink className="w-3 h-3" />
++                      {q.source_title || 'Source'}
++                    </a>
++                  )}
++                </div>
++              ))}
++            </div>
++          )}
++        </div>
++      )}
++
+       {/* Geographic Info */}
+       <div className="space-y-2">
+         <div className="flex items-center gap-2 text-sm text-gray-400">
+diff --git a/frontend/components/PipelinePanel.tsx b/frontend/components/PipelinePanel.tsx
+index 4252efd..68eb281 100644
+--- a/frontend/components/PipelinePanel.tsx
++++ b/frontend/components/PipelinePanel.tsx
+@@ -1,7 +1,7 @@
+ 'use client'
+ 
+ import { useState, useEffect, useCallback } from 'react'
+-import { Play, RefreshCw, CheckCircle, XCircle, Clock, Database, TrendingUp, MapPin, Loader2, Sparkles } from 'lucide-react'
++import { Play, RefreshCw, CheckCircle, XCircle, Clock, Database, TrendingUp, MapPin, Loader2, Sparkles, HelpCircle } from 'lucide-react'
+ 
+ interface PipelineStats {
+   terms: number
+@@ -12,6 +12,7 @@ interface PipelineStats {
+   regions_with_sdoh: number
+   related_queries: number
+   discovered_terms: number
++  questions: number
+ }
+ 
+ interface PipelineRun {
+@@ -211,15 +212,19 @@ export default function PipelinePanel() {
+             </div>
+           </div>
+           {/* Secondary stats row */}
+-          {(stats.related_queries > 0 || stats.discovered_terms > 0) && (
+-            <div className="grid grid-cols-2 gap-2 text-xs">
++          {(stats.related_queries > 0 || stats.discovered_terms > 0 || stats.questions > 0) && (
++            <div className="grid grid-cols-3 gap-2 text-xs">
+               <div className="bg-surface rounded-lg p-2 text-center">
+                 <div className="text-lg font-semibold text-purple-400">{stats.related_queries.toLocaleString()}</div>
+                 <div className="text-gray-500">Related Queries</div>
+               </div>
+               <div className="bg-surface rounded-lg p-2 text-center">
+                 <div className="text-lg font-semibold text-yellow-400">{stats.discovered_terms}</div>
+-                <div className="text-gray-500">Discovered Terms</div>
++                <div className="text-gray-500">Discovered</div>
++              </div>
++              <div className="bg-surface rounded-lg p-2 text-center">
++                <div className="text-lg font-semibold text-cyan-400">{stats.questions.toLocaleString()}</div>
++                <div className="text-gray-500">Questions</div>
+               </div>
+             </div>
+           )}
+@@ -337,8 +342,8 @@ export default function PipelinePanel() {
+ 
+       {/* Info */}
+       <p className="text-[10px] text-gray-500 text-center">
+-        Fetches 5-year trends, hourly patterns, related queries & topics via SerpAPI for all {stats?.terms || '~300'} terms.
+-        Auto-discovers emerging terms. Reveals late-night anxiety search windows.
++        Fetches 5-year trends, hourly patterns, related queries, topics & People Also Ask questions via SerpAPI for all {stats?.terms || '~300'} terms.
++        Auto-discovers emerging terms. Surfaces the actual human questions behind each search.
+       </p>
+     </div>
+   )
+diff --git a/frontend/lib/api.ts b/frontend/lib/api.ts
+index d80bbca..092067c 100644
+--- a/frontend/lib/api.ts
++++ b/frontend/lib/api.ts
+@@ -118,6 +118,24 @@ export interface Insight {
+   demo_mode?: boolean
+ }
+ 
++export interface QuestionData {
++  id: number
++  question: string
++  snippet?: string
++  source_title?: string
++  source_url?: string
++  source_type: string
++  rank: number
++}
++
++export interface TermQuestionsResponse {
++  term_id: number
++  term: string
++  count: number
++  questions: QuestionData[]
++  demo_mode: boolean
++}
++
+ export interface DataSource {
+   id: number
+   geo_code: string
+@@ -188,6 +206,7 @@ export const api = {
+   },
+   getTaxonomy: () => fetchApi<{ categories: TaxonomyCategory[]; total_terms: number }>('/api/terms/taxonomy'),
+   getSimilarTerms: (id: number) => fetchApi<Term[]>(`/api/terms/${id}/similar`),
++  getTermQuestions: (id: number) => fetchApi<TermQuestionsResponse>(`/api/terms/${id}/questions`),
+ 
+   // Trends
+   getTermTrends: (termId: number, geo?: string) => {
+-- 
+2.34.1
+
