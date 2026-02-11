@@ -1,46 +1,149 @@
-# VIOLET — Product & Technical Specification
+# VIOLET — Technical & Functional Specification
 
 **Product:** VIOLET (Visual Intelligence Layer for Oncology Trends & Evidence Triangulation)
 **Company:** SuperTruth Inc.
-**Version:** 0.1.0
-**Last Updated:** February 2026
+**Owner:** JAS (jas@evilrobot.com)
 **Classification:** CONFIDENTIAL & PROPRIETARY
 
+| Field | Value |
+|-------|-------|
+| Version | 0.9.4-alpha |
+| Last Updated | February 11, 2026 |
+| Repository | oncology-intelligence |
+| Deployment | Railway.app (frontend + backend), Neon (database) |
+| Live URL | https://violet.supertruth.ai |
+
+### Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 0.1.0 | Jan 2026 | Initial technical spec — architecture, data model, pipeline, API |
+| 0.9.0 | Feb 2026 | Added Question Surface, vulnerability window, evidence triangulation |
+| 0.9.3 | Feb 2026 | Cluster explainability, geo dedup, N+1 query fixes |
+| 0.9.4 | Feb 11, 2026 | Story Builder, Google Sheets sprint integration, full functional spec rewrite |
+
 ---
 
-## 1. WHAT VIOLET IS
+## 1. Executive Summary
 
-VIOLET is an oncology and rare disease intelligence platform that transforms Google search behavior into a navigable 3D semantic map. It ingests ~750 curated oncology search terms, embeds them using OpenAI, clusters them with HDBSCAN, projects them into 3D space with UMAP, and overlays five intelligence layers on top: trend time-series, geographic health equity (CDC Social Vulnerability Index), temporal anxiety patterns, human question phrasing, and multi-source evidence triangulation from ClinicalTrials.gov, PubMed, FDA, Google Scholar, News, and Patents.
+VIOLET is SuperTruth Inc.'s oncology and rare disease intelligence platform. It transforms Google search behavior — what people search, when they search, and how they phrase their fear — into a navigable 3D semantic map that overlays five intelligence layers: trend time-series, geographic health equity, temporal anxiety patterns, human question phrasing, and multi-source evidence triangulation.
 
-The platform answers three questions simultaneously:
-- **What** exists in the oncology search field? (structural/architectural intelligence — term clusters, semantic proximity)
-- **When** do people search? (temporal/anxiety intelligence — 2am search spikes, day-of-week patterns)
-- **How** do people phrase their fear? (narrative intelligence — People Also Ask questions, autocomplete phrasing)
+The platform serves two audiences:
+- **Researchers and clinicians** who need to see the landscape of oncology search behavior across 750+ curated terms, 25 disease categories, and 50 US states
+- **Product and operations teams** who use the integrated Story Builder and Google Sheets sprint management to plan, track, and ship features
 
-These three layers combined produce **behavioral signal intelligence** — the ability to see not just what people search for, but when they search and how they phrase it when they're scared.
+VIOLET answers three questions simultaneously: **What** exists in the search field (structural intelligence), **When** people search (anxiety intelligence — 2am search spikes), and **How** they phrase it when they're scared (narrative intelligence — People Also Ask phrasing). These three layers combined produce **behavioral signal intelligence**.
+
+This is not a medical tool. It does not diagnose, treat, or recommend. It reveals the hidden structure of how people search when confronting cancer and rare disease.
 
 ---
 
-## 2. ARCHITECTURE
+## 2. What Is Behavioral Signal Intelligence?
 
-### Stack
+### 2.1 The Problem
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Frontend | Next.js 14, React 18, TypeScript 5.3, Tailwind CSS | Dashboard + 3D visualization |
-| 3D Engine | Three.js 0.160, React Three Fiber 8.15, @react-three/drei | Interactive semantic space |
-| Charts | Recharts 2.10, D3-scale | 2D trend and heatmap charts |
-| State | Zustand 4.4 | Global app state |
-| Backend | FastAPI, Uvicorn, Python 3.11+ | REST API + pipeline |
-| Database | PostgreSQL + pgvector (Neon serverless) | Relational + vector storage |
-| Embeddings | OpenAI text-embedding-3-small (1536 dims) | Semantic meaning |
-| Clustering | UMAP + HDBSCAN | 3D projection + grouping |
-| Trends Data | SerpAPI (Google Trends, PAA, autocomplete, Scholar, News, Patents) | Search intelligence |
-| External APIs | ClinicalTrials.gov, PubMed E-utilities, FDA openFDA | Evidence triangulation |
-| SDOH | CDC Social Vulnerability Index (2020) | Health equity overlay |
-| Deployment | Railway.app (frontend + backend), Neon (database) | Cloud hosting |
+When a parent searches "is my child's bruising leukemia" at 2am, that search is not a data point — it's a signal. Traditional analytics tools count searches. VIOLET reads the signal: the fear, the timing, the geography, the phrasing.
 
-### Diagram
+Oncology search behavior is fundamentally different from commercial search behavior. People searching about cancer are not comparison shopping. They are scared, overwhelmed, and often isolated. The way they search reveals:
+
+- **What they know** — the medical vocabulary (or lack of it) in their queries
+- **What they fear** — the questions they ask ("is it hereditary?", "will my child survive?")
+- **When they're most vulnerable** — late-night searches when clinics are closed and anxiety peaks
+- **Where resources are missing** — high-vulnerability communities with high search intent but few oncology centers
+
+### 2.2 How VIOLET Solves It
+
+VIOLET ingests ~750 curated oncology search terms, generates semantic embeddings (OpenAI), clusters them (HDBSCAN), projects them into 3D space (UMAP), and overlays five intelligence layers:
+
+1. **Trend Intelligence** — 5-year time-series from Google Trends showing interest patterns
+2. **Geographic Equity** — CDC Social Vulnerability Index mapped against search intensity
+3. **Anxiety Patterns** — 24-hour hourly search data revealing "2am anxiety" windows
+4. **Question Surface** — People Also Ask and autocomplete queries — the literal fear phrased
+5. **Evidence Triangulation** — ClinicalTrials.gov, PubMed, FDA, Google Scholar, News, Patents
+
+### 2.3 The Five Layers
+
+| Layer | Data Source | What It Reveals |
+|-------|-----------|-----------------|
+| Structural | OpenAI embeddings + HDBSCAN + UMAP | Semantic relationships between diseases, treatments, concerns |
+| Temporal | SerpAPI Google Trends (5yr + hourly) | When interest spikes, seasonal patterns, 2am anxiety |
+| Geographic | CDC SVI + Google Trends by state | Where vulnerable populations search without nearby resources |
+| Narrative | SerpAPI PAA + Autocomplete | How people phrase fear ("is it normal to...", "will my child...") |
+| Evidentiary | 6 external APIs | What clinical evidence exists, how strong it is |
+
+---
+
+## 3. Product Overview
+
+### 3.1 Vision & Mission
+
+**Vision:** Make the invisible architecture of oncology search behavior visible, navigable, and actionable.
+
+**Mission:** Provide researchers, clinicians, patient advocates, and caregivers with the world's most comprehensive view of how people search when confronting cancer and rare disease — and surface the gaps where people search but resources don't exist.
+
+### 3.2 Target Users
+
+| Persona | Role | What They Do in VIOLET |
+|---------|------|----------------------|
+| Researcher | Academic/pharma research | Explore term clusters, discover emerging search patterns, triangulate evidence |
+| Clinician | Oncologist/rare disease specialist | Understand patient concerns, see what questions patients ask before appointments |
+| Patient Advocate | Nonprofit/foundation leader | Identify underserved communities, map search-to-resource gaps |
+| Caregiver | Parent/family of patient | (Indirect) — VIOLET surfaces the questions caregivers ask at 2am |
+| Data Analyst | SuperTruth internal | Run pipelines, manage taxonomy, QA data quality |
+| Product Owner | SuperTruth team (JAS, Dustin) | Sprint planning via Story Builder, feature prioritization |
+
+### 3.3 Core Capabilities
+
+| Capability | Description |
+|-----------|-------------|
+| 3D Semantic Map | Interactive Three.js visualization of 750+ search terms in clustered 3D space |
+| Cluster Navigation | Click clusters to isolate, fly through space with WASD controls or auto-tour |
+| Trend Analysis | 5-year time-series per term/cluster with spike/drop/emerging detection |
+| SDOH Overlay | Vulnerability-adjusted search intensity (Interest x (1+SVI)) by US state |
+| Anxiety Window | 24-hour hourly heatmaps showing late-night search patterns |
+| Question Surface | Cross-term search of People Also Ask + autocomplete questions |
+| Evidence Triangulation | 6-source lookup: ClinicalTrials, PubMed, FDA, Scholar, News, Patents |
+| Multi-Region Compare | Side-by-side term/category comparison across geographies |
+| AI Chat | Conversational interface with full database context injection |
+| Anomaly Detection | Automatic spike, drop, emerging term, and regional outlier flagging |
+| Auto Taxonomy Expansion | Pipeline auto-discovers and promotes breakout search terms |
+| Story Builder | LLM-guided user story wizard with Google Sheets sprint sync |
+| Demo Mode | Full synthetic data generation for demos without API keys |
+
+### 3.4 Explicit Non-Goals
+
+VIOLET intentionally does **not**:
+- Provide medical advice, diagnosis, or treatment recommendations
+- Store or process individual patient data (HIPAA scope excluded)
+- Predict disease outcomes or survival rates
+- Replace clinical decision support systems
+- Perform real-time search monitoring (data is batch-processed)
+- Serve as a consumer-facing product (research/internal only)
+
+### 3.5 Feature Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| 3D Semantic Map | Live | Full UMAP + HDBSCAN pipeline, interactive Three.js |
+| Trend Time-Series | Live | SerpAPI, 5-year data, per-term and per-cluster |
+| SDOH Overlay | Live | CDC SVI 2020, all 50 states, vulnerability-adjusted scoring |
+| Question Surface | Live | PAA + autocomplete, cross-term search |
+| Anxiety Window | Live | 24-hour hourly patterns, anxiety index |
+| Evidence Triangulation | Live | 6 external APIs, on-demand queries |
+| Multi-Region Compare | Live | Country-level comparison |
+| AI Chat | Live | GPT-4o-mini with database context |
+| Anomaly Detection | Live | Spike/drop/emerging/regional detection |
+| Auto Taxonomy Expansion | Live | Breakout term promotion, capped at 50/run |
+| Story Builder | Live | LLM wizard + Google Sheets sync |
+| Cluster Explainability | Planned (S1) | Proximity index, scale index, narrative generator |
+| Pipeline Scheduler | Planned | Automated daily/weekly runs |
+| Export/Reporting | Planned | PDF/CSV export of insights |
+
+---
+
+## 4. System Architecture
+
+### 4.1 High-Level Architecture
 
 ```
 User (Browser)
@@ -49,10 +152,11 @@ User (Browser)
 Next.js Frontend (Railway)
    │  Three.js 3D Canvas + React panels
    │  Zustand state management
+   │  Middleware auth (cookie-based)
    │
    ▼
 FastAPI Backend (Railway)
-   │  9 API route modules + chat
+   │  11 API route modules + chat
    │  Pipeline orchestrator (8 steps)
    │
    ├──▶ PostgreSQL + pgvector (Neon)
@@ -62,427 +166,34 @@ FastAPI Backend (Railway)
    ├──▶ OpenAI API
    │     Embeddings (text-embedding-3-small)
    │     Chat (gpt-4o-mini)
+   │     Story Builder assist (gpt-4o-mini)
    │
    ├──▶ SerpAPI
    │     Google Trends, PAA, Autocomplete,
    │     Scholar, News, Patents
    │
+   ├──▶ Google Sheets API
+   │     Sprint Dashboard, Sprint Backlog,
+   │     Taxonomy Governance, Release Tracker
+   │
    └──▶ External APIs (on-demand, not stored)
          ClinicalTrials.gov, PubMed, FDA openFDA
 ```
 
----
-
-## 3. DATA MODEL
-
-### SearchTerm (primary entity)
-The core unit. Every search term in the taxonomy becomes a positioned point in 3D space.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| term | varchar(500) | Unique search string, e.g. "BRCA gene mutation" |
-| normalized_term | varchar(500) | Lowercase indexed version |
-| category | varchar(100) | High-level: pediatric_oncology, adult_oncology, treatment, rare_genetic, etc. |
-| subcategory | varchar(100) | Fine-grained: leukemia, brain_tumor, immunotherapy, etc. |
-| parent_term_id | int (FK) | Hierarchical parent relationship |
-| embedding | vector(1536) | OpenAI text-embedding-3-small |
-| x, y, z | float | 3D coordinates from UMAP reduction |
-| cluster_id | int (FK) | Semantic cluster assignment |
-
-### Cluster
-Semantic groupings of related terms, auto-generated by HDBSCAN.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| name | varchar(200) | Auto-generated from member term names |
-| description | text | Optional context |
-| centroid_x, centroid_y, centroid_z | float | 3D center point |
-| centroid_embedding | vector(1536) | Average embedding of members |
-| color | varchar(7) | Hex color for visualization |
-| size | float | Relative visual size (default 1.0) |
-| term_count | int | Cached member count |
-| avg_search_volume | float | Computed from TrendData |
-
-### TrendData
-Time-series search interest from Google Trends via SerpAPI.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| term_id | int (FK) | Parent search term |
-| date | date | Data point date |
-| geo_code | varchar(10) | e.g. "US", "US-CA" |
-| geo_level | varchar(20) | "country", "state", "metro" |
-| interest | int | 0-100 relative search interest |
-| interest_normalized | float | Normalized across time range |
-| granularity | varchar(20) | "daily", "weekly", "monthly" |
-
-### GeographicRegion
-US states with CDC Social Vulnerability Index data.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| geo_code | varchar(10) | Unique, e.g. "US-MS" |
-| name | varchar(100) | "Mississippi" |
-| level | varchar(20) | "state", "county", "metro", "country" |
-| latitude, longitude | float | Centroid coordinates |
-| population | int | Census data |
-| svi_overall | float | 0-1, higher = more vulnerable |
-| svi_socioeconomic | float | Poverty, unemployment, income, education |
-| svi_household_disability | float | Disability, age, single parents |
-| svi_minority_language | float | Race/ethnicity, language barriers |
-| svi_housing_transport | float | Housing type, crowding, no car |
-| uninsured_rate | float | Healthcare access |
-| pediatric_oncology_centers | int | Nearby specialized centers |
-| intent_intensity | float | Average search interest across all terms |
-| vulnerability_adjusted_intent | float | Interest × (1 + SVI) |
-
-### RelatedQuery
-Discovered related searches from Google Trends — used for automatic taxonomy expansion.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| source_term_id | int (FK) | Parent search term |
-| query | varchar(500) | The related search string |
-| query_type | varchar(50) | "rising_query", "top_query", "rising_topic", "top_topic" |
-| topic_type | varchar(100) | "Disease", "Drug", "Treatment", etc. |
-| value | varchar(100) | Raw: "+450%", "Breakout", "100" |
-| extracted_value | float | Numeric: 450, -1 (Breakout), 100 |
-| is_promoted | bool | Whether promoted to taxonomy |
-| promoted_term_id | int (FK) | If promoted, the resulting SearchTerm |
-
-### HourlyPattern
-Temporal search behavior — reveals "2am anxiety" patterns.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| term_id | int (FK) | Parent search term |
-| hourly_avg | JSON | {0: 45, 1: 52, ..., 23: 68} — average interest by hour |
-| day_of_week_avg | JSON | {"Mon": 55, ..., "Sun": 42} |
-| peak_hours | JSON | Top 3 hours, e.g. [22, 23, 21] |
-| anxiety_index | float | Late-night / daytime ratio (>1.0 = night-skewed) |
-| late_night_avg | float | Average 11pm-4am interest |
-| daytime_avg | float | Average 8am-6pm interest |
-
-### QuestionSurface
-Literal human question phrasing — "the fear phrased."
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| source_term_id | int (FK) | Parent search term |
-| question | varchar(1000) | Full question text, e.g. "Is BRCA testing covered by insurance?" |
-| snippet | text | Google's answer preview |
-| source_title | varchar(500) | Title of answering page |
-| source_url | varchar(2000) | URL of answering page |
-| source_type | varchar(50) | "people_also_ask" or "autocomplete" |
-| rank | int | Position in search results |
-| fetched_at | datetime | Timestamp |
-
-### Post
-External resources positioned in the 3D semantic space.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | int (PK) | Auto-increment |
-| title | varchar(500) | Resource title |
-| url | varchar(2000) | External URL |
-| source | varchar(100) | "pubmed", "clinical_trial", "article", etc. |
-| source_id | varchar(100) | External ID (e.g. PMID) |
-| content_type | varchar(50) | "article", "video", "tool", "clinical_trial" |
-| embedding | vector(1536) | For semantic positioning |
-| x, y, z | float | 3D coordinates near relevant cluster |
-| cluster_id | int (FK) | Associated cluster |
-| relevance_score | float | Semantic matching score |
-| is_featured | bool | Manual curation flag |
-
-### DataSource / PipelineRun
-Pipeline tracking and execution history for auditing.
-
----
-
-## 4. DATA PIPELINE
-
-The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchestrator`.
-
-### Step 1: Load Taxonomy
-- Loads 749+ curated seed terms from `pipeline/taxonomy.py`
-- Creates SearchTerm records if not existing
-- Sets up parent-child relationships
-- 20 categories including pediatric_oncology, adult_oncology, treatment, rare_genetic, rare_neurological, rare_autoimmune, rare_pulmonary, rare_metabolic, rare_immune, rare_cancer, clinical_trials, symptoms, diagnosis, support, survivorship, caregiver, costs, emerging, integrative, prevention
-- Notable additions: SYNGAP1 and 6 related terms (SYNGAP1 syndrome, SYNGAP1 related disorder, SYNGAP1 epilepsy, SYNGAP1 gene therapy, SYNGAP1 clinical trials, SYNGAP1 intellectual disability) in rare_neurological > developmental
-
-### Step 2: Generate Embeddings
-- OpenAI text-embedding-3-small (1536 dimensions)
-- Batches of 100 terms per API call
-- Context-enriched: "Pediatric oncology search query about leukemia: ALL in children"
-
-### Step 3: Cluster & Project to 3D
-- UMAP: 1536-dim → 3D (n_neighbors=10, min_dist=0.5, spread=2.0, metric=cosine)
-- HDBSCAN: min_cluster_size=5, min_samples=3, metric=euclidean
-- Updates SearchTerm with x, y, z coordinates and cluster_id
-- Creates Cluster records with centroids and colors
-
-### Step 4: Fetch Search Trends (SerpAPI)
-- For each term: interest-over-time, interest-by-region, related queries, related topics
-- Timeframe: "today 5-y" (5 years)
-- Geo: "US" (with state-level breakdown)
-- Commits every 10 terms
-- Rate limited: 0.5s delay between API calls
-
-### Step 5: Expand Taxonomy from Discoveries
-- Queries RelatedQuery records with extracted_value ≥ 200 (200%+ growth or "Breakout")
-- Promotes high-value related queries to new SearchTerms
-- Max 50 new terms per run
-- Sets subcategory = "discovered:{query_type}"
-- Re-embeds and re-clusters discovered terms
-
-### Step 6: Fetch Questions (Question Surface)
-- SerpAPI google_related_questions engine: People Also Ask (2 pages per term)
-- SerpAPI google_autocomplete engine: seeded with 10 question prefixes
-- Prefixes: "how do I", "where can I", "what is", "is it normal to", "can I", "why does", "what are the symptoms of", "what happens if", "how long does", "should I"
-- Deduplicates across sources (PAA takes priority for richer metadata)
-- Stores 8-15 questions per term
-
-### Step 7: Fetch Hourly Patterns (Vulnerability Window)
-- SerpAPI 7-day hourly data
-- Computes hourly averages (0-23), day-of-week averages, peak hours
-- Calculates anxiety_index = late_night_avg / daytime_avg
-- Late night = 11pm-4am, Daytime = 8am-6pm
-
-### Step 8: Load SDOH Data
-- CDC Social Vulnerability Index (2020 county-level CSV)
-- Aggregated to state level (population-weighted)
-- Updates GeographicRegion SVI fields
-
----
-
-## 5. API ENDPOINTS
-
-### Clusters (`/api/clusters`)
-- `GET /` — List all clusters (filterable by category)
-- `GET /visualization` — 3D data: clusters + terms + posts with coordinates
-- `GET /{cluster_id}` — Detail with member terms and posts
-
-### Terms (`/api/terms`)
-- `GET /` — Searchable, filterable term catalog
-- `GET /taxonomy` — Categories with counts and subcategories
-- `GET /{term_id}` — Full term detail
-- `GET /{term_id}/similar` — Semantic neighbors (pgvector cosine distance)
-- `GET /{term_id}/related` — Related queries from Google Trends
-- `GET /{term_id}/questions` — People Also Ask questions
-- `GET /discovered/all` — Auto-discovered terms from pipeline
-
-### Trends (`/api/trends`)
-- `GET /term/{term_id}` — Time-series for single term
-- `GET /cluster/{cluster_id}` — Aggregated cluster trends
-- `GET /top` — Highest interest terms
-- `GET /comparison` — Side-by-side term comparison
-- `GET /vulnerability/{term_id}` — Hourly anxiety pattern
-- `GET /vulnerability/top-anxious` — Most night-searched terms
-
-### Geography (`/api/geography`)
-- `GET /regions` — All US states (filterable by level)
-- `GET /regions/{geo_code}` — Region detail with SDOH
-- `GET /heatmap` — Interest + vulnerability for map visualization
-- `GET /sdoh-summary` — SVI statistics and high-vulnerability regions
-
-### Insights (`/api/insights`)
-- `GET /` — Detected anomalies sorted by severity
-- `GET /summary` — Counts by type/severity
-- `GET /term/{term_id}` — Anomalies for specific term
-- `GET /cluster/{cluster_id}` — Anomalies in cluster
-- Types: spike, drop, emerging, regional_outlier, seasonal_anomaly, correlation
-- Severities: high, medium, low
-
-### Questions (`/api/questions`)
-- `GET /top` — Most frequent questions across all terms
-- `GET /search?q=...` — Full-text search across all questions
-- `GET /stats` — Coverage: total questions, by source type, terms with questions
-
-### Triangulation (`/api/triangulate`)
-- `GET /term/{term_id}` — Multi-source evidence for a term
-- `GET /search` — Search any query across sources
-- `GET /clinical-trials` — ClinicalTrials.gov direct search
-- `GET /pubmed` — PubMed direct search
-- `GET /fda` — FDA openFDA (drug approvals + adverse events)
-- `GET /news` — Google News
-- `GET /scholar` — Google Scholar with citation counts
-- `GET /patents` — Google Patents
-- `GET /sources` — List all data sources
-
-### Compare (`/api/compare`)
-- `GET /sources` — Available geo/timeframe combinations
-- `GET /regions` — Single term across multiple countries
-- `GET /top-terms` — Top N terms per region
-- `GET /category-comparison` — Category averages by region
-
-### Chat (`/api/chat`)
-- `POST /` — Conversational AI (OpenAI gpt-4o-mini with database context)
-- `GET /suggestions` — Starter questions
-
-### Stories (`/api/stories`) — Story Builder
-- `GET /context` — Fetch existing epics, sprints, features, assignees from Google Sheet for dropdowns
-- `POST /assist` — LLM-powered story writing help (steps: idea, story, criteria, refine). Returns structured JSON with draft fields.
-- `POST /submit` — Push completed user story to Sprint Backlog tab in Google Sheet
-
-### Pipeline (`/api/pipeline`)
-- `GET /runs` — Pipeline execution history
-- `GET /runs/{run_id}` — Specific run status
-- `POST /run` — Trigger full pipeline (background task)
-- `GET /stats` — Current data volume (terms, clusters, trend points, regions, queries, questions)
-
----
-
-## 6. FRONTEND COMPONENTS
-
-### Main Layout (page.tsx)
-Three-column layout: Left sidebar (w-72) | 3D Canvas (flex-1) | Right sidebar (w-96)
-
-### ClusterVisualization.tsx (Core 3D Engine — ~850 lines)
-The heart of the UI. Interactive Three.js scene rendered in a React Three Fiber Canvas.
-
-Sub-components:
-- **DataPoint** — Individual search term sphere with glow, hover/selection animations, color gradient cyan→pink
-- **ClusterOrb** — Cluster center icosahedron with rotating wireframe rings, clickable core
-- **BoundingCube** — 12-edge wireframe boundary (12×12×12 space)
-- **DataConnections** — Lines from terms to cluster centroids
-- **AmbientParticles** — 600 starfield background particles
-- **FlyControls** — WASD first-person navigation mode
-- **AutoPilot** — Cinematic camera tour with Catmull-Rom spline waypoints
-- **CameraController** — Smooth lerp to store-controlled position on selection
-
-Bottom control bar buttons: "Show All" (resets to full galaxy, only visible when a cluster/category is focused), "Auto Tour" (Catmull-Rom fly-through), "Float Mode" (WASD first-person). Clicking a cluster sets `filters.clusterId` to isolate that cluster's terms and orb; `filteredClusters` useMemo respects `clusterId` to show only the focused cluster.
-
-### FilterPanel.tsx
-- Real-time search across terms
-- Expandable category accordion (25 categories with color coding)
-- Geography dropdown (50 US states)
-- Click category → camera animates to category centroid
-
-### DetailPanel.tsx
-Appears when a term or cluster is selected. Close (X) button calls `resetView()` — clears selection, resets filters, and snaps camera back to the full galaxy overview `[0,0,15]`.
-
-Sections:
-- Header with type badge, name, category tag
-- Trend chart (Recharts LineChart, 90-day time series)
-- Similar Terms (top 5 semantic neighbors, clickable)
-- People Also Ask (collapsible, top 10 questions with snippets and source links)
-- Top Regions (top 5 by interest)
-- Google Search link
-
-### InsightsPanel.tsx
-Anomaly detection dashboard with type filters (Spikes, Emerging, Regional), severity dots, clickable cards that focus the 3D camera on the relevant term.
-
-### VulnerabilityInsightsPanel.tsx
-SDOH × Search Intent cross-reference. Formula: Interest × (1 + SVI) = Vulnerability-Adjusted Score. Sortable by combined score, interest, or vulnerability. Expandable rows with calculation breakdown.
-
-### VulnerabilityWindow.tsx
-24-hour anxiety pattern heatmaps. Two views:
-- Hourly Heatmap: 24-column grid color-coded purple→pink→red, late-night zone highlighted
-- Most Anxious: ranked terms by anxiety_index (late-night/daytime ratio)
-Insight text dynamically generated based on anxiety_index threshold.
-
-### DataSourcesPanel.tsx
-Two tabs: All Sources (7 data sources with status) and Evidence (per-term triangulation from 6 sources with evidence strength badge).
-
-### PipelinePanel.tsx
-Stats grid (terms, trend points, regions, related queries, discovered terms, questions), status banner, run button with animated progress visualization (6-step indicator: Taxonomy → Embed → Trends → Discover → Hourly → SDOH).
-
-### ChatPanel.tsx
-Floating chat window (expandable/minimizable). OpenAI gpt-4o-mini with database context injection. Suggestion chips, conversation history, source citations.
-
-### ExplainerPanel.tsx
-Guided tour modal (? button in header) explaining the 3D map, clusters, data sources, SDOH, and AI discovery. Uses createPortal to render above Three.js canvas.
-
-### ViewControls.tsx
-Overlay toggles: Labels on/off, Connections on/off, Reset Camera, Point Size ±.
-
-### StatsBar.tsx
-Header statistics: terms count, clusters count, data points, regions, period, sources.
-
----
-
-## 7. DESIGN SYSTEM
-
-### Colors
-- Background: #0a0a0f
-- Surface: #12121a
-- Border: #1e1e2e
-- Primary: #6366f1 (Indigo) / #00d4ff (Cyan in 3D)
-- Secondary: #ec4899 (Pink) / #ff6b9d (Pink in 3D)
-- Tertiary: #a855f7 (Purple)
-- Accent: #fbbf24 (Gold — selected items)
-
-### Category Colors (25 mapped)
-pediatric_oncology → blue-500, adult_oncology → indigo-500, rare_genetic → purple-500, rare_neurological → pink-500, clinical_trials → cyan-500, treatment → green-500, symptoms → yellow-500, diagnosis → orange-500, support → teal-500, survivorship → emerald-500, caregiver → rose-500, costs → amber-500, emerging → violet-500, integrative → lime-500, prevention → sky-500
-
-### Glass Morphism
-```css
-background: rgba(12, 12, 20, 0.8);
-border: 1px solid rgba(30, 30, 46, 0.5);
-border-radius: 12px;
-backdrop-filter: blur(12px);
-```
-
----
-
-## 8. DEMO MODE
-
-When no real pipeline data exists, VIOLET generates realistic synthetic data for every endpoint:
-- Trend time-series: 90-day data with seeded pseudorandom for reproducibility
-- Geographic interest: MD5 hash of geo_code produces deterministic varied values per state
-- Insights: Sample anomalies spread across actual taxonomy categories
-- Questions: Template-based PAA questions per term ("What is {term}?", "What are the symptoms of {term}?", etc.)
-- Vulnerability windows: Synthetic hourly patterns with realistic anxiety profiles
-
-Demo mode is flagged in responses (`demo_mode: true`) so the UI can show appropriate banners.
-
----
-
-## 9. ENVIRONMENT VARIABLES
-
-### Required
-- `DATABASE_URL` — PostgreSQL connection (Neon serverless, requires `sslmode=require`)
-- `OPENAI_API_KEY` — For embeddings + chat
-- `SERPAPI_KEY` — For Google Trends and related engines
-
-### Optional
-- `AZURE_STORAGE_CONNECTION_STRING` — Cloud blob storage
-- `ENVIRONMENT` — "development" or "production"
-- `LOG_LEVEL` — Default "INFO"
-- `NEXT_PUBLIC_API_URL` — Backend URL for frontend
-
----
-
-## 10. KEY DESIGN DECISIONS
-
-1. **SerpAPI over pytrends**: pytrends was unreliable and rate-limited. SerpAPI provides structured JSON, supports multiple engines (Trends, PAA, Autocomplete, Scholar, News, Patents), and has consistent rate limits.
-
-2. **Separate QuestionSurface model vs RelatedQuery**: Questions from PAA/autocomplete have fundamentally different shape (snippets, source URLs, titles) than related queries from Google Trends (growth percentages, topic types). Separate models keep the data clean.
-
-3. **UMAP + HDBSCAN over alternatives**: UMAP preserves both local and global structure better than t-SNE for 3D projection. HDBSCAN handles noise (unclustered terms) gracefully and doesn't require specifying cluster count upfront.
-
-4. **pgvector for semantic search**: Enables fast cosine similarity queries directly in PostgreSQL without a separate vector database. IVFFlat index keeps queries fast at scale.
-
-5. **Batch commits every 10 terms**: Pipeline commits after every 10 terms to prevent massive transaction rollbacks if something fails mid-run.
-
-6. **Clear-on-rerun pattern**: Pipeline deletes old data before inserting new data for each category (TrendData, RelatedQuery, QuestionSurface, HourlyPattern) to avoid duplicates without complex upsert logic.
-
-7. **Automatic taxonomy expansion**: Related queries with 200%+ growth or "Breakout" status are auto-promoted to full SearchTerms, capped at 50 per run to prevent taxonomy explosion.
-
-8. **Demo mode fallback**: Every endpoint can generate realistic synthetic data, enabling development and demos without requiring API keys or pipeline runs.
-
-9. **Auto-seed taxonomy on startup**: `database.py` contains `seed_taxonomy()` which runs during `init_db()`. It loads all taxonomy terms from `pipeline/taxonomy.py` with deterministic 3D coordinates (MD5 hash-based offsets from category center positions) and creates Cluster records per category. This means deploying the code with new taxonomy terms is sufficient to make them appear in the app — no manual pipeline run needed. On subsequent startups, it detects and seeds only new terms added since the last seed.
-
----
-
-## 11. FILE STRUCTURE
+### 4.2 Application Layers
+
+| Layer | Technology | Responsibility |
+|-------|-----------|----------------|
+| Presentation | Next.js 14, React 18, Three.js | 3D visualization, panels, Story Builder |
+| Styling | Tailwind CSS 3.4, glass morphism | Dark theme, responsive layout |
+| State | Zustand 4.4 | Client-side selection, filters, camera state |
+| API Gateway | FastAPI + Uvicorn | REST endpoints, CORS, middleware |
+| Business Logic | Python route handlers | Data aggregation, anomaly detection, LLM orchestration |
+| Pipeline | Python orchestrator | 8-step ETL: taxonomy → embed → cluster → trends → discover → questions → hourly → SDOH |
+| Storage | PostgreSQL + pgvector (Neon) | Relational data + vector similarity search |
+| External | SerpAPI, OpenAI, Google Sheets, ClinicalTrials, PubMed, FDA | Data sources and integrations |
+
+### 4.3 Directory Structure
 
 ```
 oncology-intelligence/
@@ -490,7 +201,7 @@ oncology-intelligence/
 │   ├── app/
 │   │   ├── main.py              # FastAPI app, middleware, router registration
 │   │   ├── config.py             # Pydantic Settings (env vars)
-│   │   ├── database.py           # PostgreSQL connection, schema init, SDOH seeding, taxonomy auto-seed
+│   │   ├── database.py           # PostgreSQL connection, schema init, taxonomy auto-seed
 │   │   ├── models.py             # All SQLAlchemy models
 │   │   └── routes/
 │   │       ├── clusters.py       # Cluster listing, 3D viz data
@@ -503,7 +214,7 @@ oncology-intelligence/
 │   │       ├── triangulation.py  # External evidence APIs
 │   │       ├── pipeline.py       # Pipeline management
 │   │       ├── chat.py           # Conversational AI
-│   │       └── stories.py       # Story Builder API (Google Sheets + LLM assist)
+│   │       └── stories.py        # Story Builder (Google Sheets + LLM)
 │   ├── pipeline/
 │   │   ├── orchestrator.py       # 8-step pipeline coordinator
 │   │   ├── taxonomy.py           # 749+ seed terms, 20 categories
@@ -518,16 +229,15 @@ oncology-intelligence/
 │   │   └── sample_data.json      # Demo seed data
 │   ├── Dockerfile
 │   ├── Procfile
-│   ├── requirements.txt
-│   └── pyproject.toml
+│   └── requirements.txt
 ├── frontend/
 │   ├── app/
 │   │   ├── layout.tsx            # Root layout, metadata
 │   │   ├── page.tsx              # Main 3-column dashboard
-│   │   ├── globals.css           # Tailwind imports
-│   │   ├── login/page.tsx        # Auth page
-│   │   ├── story-builder/page.tsx # LLM-guided user story wizard (for Dustin)
-│   │   └── api/auth/route.ts     # Auth endpoint
+│   │   ├── globals.css           # Tailwind + glass morphism + animations
+│   │   ├── login/page.tsx        # Password auth page
+│   │   ├── story-builder/page.tsx # LLM-guided story creation wizard
+│   │   └── api/auth/route.ts     # Cookie-based auth endpoint
 │   ├── components/
 │   │   ├── ClusterVisualization.tsx   # 3D engine (~850 lines)
 │   │   ├── FilterPanel.tsx           # Search + category browser
@@ -546,7 +256,8 @@ oncology-intelligence/
 │   │   └── Tooltip.tsx               # Smart-positioning tooltips
 │   ├── lib/
 │   │   ├── api.ts                # API client + type definitions
-│   │   └── store.ts              # Zustand global state (key actions: selectAndFocusCluster sets filters.clusterId for isolation, resetView clears selection+filters+camera)
+│   │   └── store.ts              # Zustand global state
+│   ├── middleware.ts             # Auth middleware (cookie check, login redirect)
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── next.config.js            # Standalone output, API_URL
@@ -555,19 +266,638 @@ oncology-intelligence/
 │   ├── init_and_seed.py
 │   ├── seed_database.py
 │   └── run_pipeline.py
-├── .env.example
-├── railway.json
 ├── VIOLET_SPEC.md                # THIS FILE
-├── CLAUDE.md                     # Session instructions for Claude
-└── VIOLET_Demo_Script_SYNGAP1.docx  # Bobby's demo walkthrough for Becky Quick
+└── CLAUDE.md                     # Session instructions for Claude
 ```
 
 ---
 
-## 12. HOW TO BRIEF CLAUDE ON VIOLET
+## 5. Technology Stack
 
-When starting a new session (chat or Cowork), provide this context:
+### 5.1 Runtime Dependencies — Frontend
 
-> Read the file VIOLET_SPEC.md in the oncology-intelligence repository root. This is the comprehensive product and technical specification for the VIOLET platform — SuperTruth Inc.'s oncology intelligence tool. It covers architecture, data models, pipeline steps, API endpoints, frontend components, and design decisions. After reading it, you'll be fully briefed on what VIOLET is and how it works.
+| Package | Version | Purpose |
+|---------|---------|---------|
+| next | 14.1.0 | React framework with App Router |
+| react / react-dom | 18.2.0 | UI library |
+| three | 0.160.0 | 3D rendering engine |
+| @react-three/fiber | 8.15.0 | React bindings for Three.js |
+| @react-three/drei | 9.96.0 | Three.js helpers (OrbitControls, etc.) |
+| recharts | 2.10.0 | 2D charts (trend lines, heatmaps) |
+| zustand | 4.4.0 | Lightweight state management |
+| swr | 2.2.0 | Data fetching with caching |
+| d3-scale / d3-scale-chromatic | 4.x | Color scales and data mapping |
+| lucide-react | 0.312.0 | Icon library |
+
+### 5.2 Runtime Dependencies — Backend
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| fastapi | 0.109+ | REST API framework |
+| uvicorn | 0.27+ | ASGI server |
+| sqlalchemy | 2.0+ | ORM |
+| psycopg2-binary | 2.9+ | PostgreSQL driver |
+| pgvector | 0.2+ | Vector similarity in PostgreSQL |
+| openai | 1.12+ | Embeddings + chat completions |
+| google-search-results | 2.4+ | SerpAPI client |
+| google-api-python-client | 2.100+ | Google Sheets API |
+| google-auth | 2.25+ | Service account authentication |
+| umap-learn | 0.5+ | Dimensionality reduction (1536 → 3D) |
+| hdbscan | 0.8+ | Density-based clustering |
+| scikit-learn | 1.4+ | ML utilities |
+| pandas / numpy | 2.2+ / 1.26+ | Data processing |
+| pydantic / pydantic-settings | 2.6+ / 2.1+ | Request validation, env config |
+
+---
+
+## 6. Authentication & Authorization
+
+### 6.1 Authentication Flow
+
+VIOLET uses cookie-based password authentication via Next.js middleware.
+
+1. User visits any page → middleware checks for `violet_auth` cookie
+2. If missing → redirect to `/login`
+3. User enters password → `POST /api/auth` validates against `BASIC_AUTH_PASSWORD` env var
+4. If valid → sets `violet_auth=authenticated` cookie → redirect to requested page
+5. All subsequent requests pass through with cookie present
+
+### 6.2 Middleware Configuration
+
+The middleware (`frontend/middleware.ts`) protects all routes except:
+- `/login` — the auth page itself
+- `/api/auth` — the auth endpoint
+- `/_next/static`, `/_next/image`, `favicon.ico` — static assets
+
+### 6.3 Backend Authentication
+
+The backend API runs without direct auth (CORS open). The frontend handles authentication. This is acceptable because:
+- The backend is not directly exposed to end users
+- Railway networking keeps the backend service internal
+- Future: API key auth for programmatic access
+
+### 6.4 Google Sheets Integration Auth
+
+The Story Builder authenticates to Google Sheets via a GCP service account:
+- Project: `violet-sheets-mcp`
+- Service account: `violet-mcp@violet-sheets-mcp.iam.gserviceaccount.com`
+- APIs enabled: Google Sheets API, Google Drive API
+- Credentials: Base64-encoded JSON key stored as `GOOGLE_SERVICE_ACCOUNT_JSON_B64` env var on Railway
+- Fallback: File path `~/.config/google/violet-mcp-key.json` for local development
+
+---
+
+## 7. Core Functional Modules
+
+### 7.1 3D Semantic Map (ClusterVisualization.tsx)
+
+The heart of VIOLET. An interactive Three.js scene rendering 750+ search terms as glowing spheres in 3D semantic space.
+
+**Sub-components:**
+- **DataPoint** — Search term sphere with glow, hover/selection animations, color gradient cyan→pink
+- **ClusterOrb** — Cluster center icosahedron with rotating wireframe rings
+- **BoundingCube** — 12-edge wireframe boundary (12×12×12 space)
+- **DataConnections** — Lines from terms to cluster centroids
+- **AmbientParticles** — 600 starfield background particles
+- **FlyControls** — WASD first-person navigation
+- **AutoPilot** — Cinematic Catmull-Rom spline camera tour
+- **CameraController** — Smooth lerp to store-controlled position on selection
+
+**Interaction:** Click cluster → isolate cluster terms → camera flies to centroid. Click term → detail panel opens. ESC/Show All → reset to full galaxy view `[0,0,15]`.
+
+### 7.2 Filter & Search (FilterPanel.tsx)
+
+- Real-time fuzzy search across all terms
+- Expandable category accordion (25 categories with color coding)
+- Geography dropdown (50 US states)
+- Click category → camera animates to category centroid
+
+### 7.3 Detail Panel (DetailPanel.tsx)
+
+Appears on term/cluster selection. Contains:
+- Header: type badge, name, category tag
+- Trend chart: Recharts LineChart, 90-day time series
+- Similar Terms: top 5 semantic neighbors via pgvector cosine distance
+- People Also Ask: top 10 questions with snippets and source links
+- Top Regions: top 5 states by interest
+- Google Search link
+
+### 7.4 Anomaly Detection (InsightsPanel.tsx)
+
+Automatic pattern detection across the dataset:
+
+| Type | What It Detects |
+|------|----------------|
+| Spike | Sudden interest increase (>2σ above rolling mean) |
+| Drop | Sudden interest decrease |
+| Emerging | New terms with accelerating growth |
+| Regional Outlier | State-level interest significantly above national average |
+| Seasonal Anomaly | Out-of-season interest patterns |
+| Correlation | Co-moving term pairs |
+
+Severity levels: high, medium, low. Clickable cards fly camera to the relevant term.
+
+### 7.5 SDOH Vulnerability Analysis (VulnerabilityInsightsPanel.tsx)
+
+Cross-references search intent with CDC Social Vulnerability Index:
+
+**Formula:** `Vulnerability-Adjusted Score = Interest × (1 + SVI)`
+
+This surfaces communities where high search interest meets high social vulnerability — places where people are searching but resources may be scarce. Sortable by combined score, interest, or vulnerability. Expandable rows show calculation breakdown.
+
+### 7.6 Anxiety Window (VulnerabilityWindow.tsx)
+
+24-hour hourly search pattern analysis. Two views:
+
+1. **Hourly Heatmap** — 24-column grid, color-coded purple→pink→red, late-night zone (11pm-4am) highlighted
+2. **Most Anxious** — Terms ranked by `anxiety_index = late_night_avg / daytime_avg`
+
+Terms with anxiety_index > 1.0 are night-skewed — people search these more when clinics are closed.
+
+### 7.7 Question Surface (Questions endpoint + DetailPanel)
+
+Captures the literal language of fear. Sources:
+- **People Also Ask** — Google's related questions (2 pages per term via SerpAPI)
+- **Autocomplete** — Seeded with 10 question prefixes: "how do I", "where can I", "what is", "is it normal to", "can I", "why does", "what are the symptoms of", "what happens if", "how long does", "should I"
+
+Cross-term search at `/api/questions/search?q=...` finds questions across the entire dataset.
+
+### 7.8 Evidence Triangulation (DataSourcesPanel.tsx)
+
+On-demand multi-source evidence lookup for any term:
+
+| Source | API | Data |
+|--------|-----|------|
+| ClinicalTrials.gov | REST API | Active trials, phases, locations |
+| PubMed | E-utilities | Published research, citations |
+| FDA openFDA | REST API | Drug approvals, adverse events |
+| Google Scholar | SerpAPI | Academic papers, citation counts |
+| Google News | SerpAPI | Recent news coverage |
+| Google Patents | SerpAPI | Patent filings |
+
+Evidence strength badge per source. Results are fetched on-demand, not stored.
+
+### 7.9 Multi-Region Comparison (RegionComparisonPanel.tsx)
+
+Compare a single term across multiple countries/states, or compare top terms across regions. Category-level comparison shows which disease areas generate the most interest per geography.
+
+### 7.10 AI Chat (ChatPanel.tsx)
+
+Floating expandable chat window. OpenAI gpt-4o-mini with full database context injection:
+- Total terms, clusters, trend points
+- Top trending terms (30-day)
+- Cluster membership
+- Category breakdown
+- High-vulnerability regions
+- Recent search spikes
+
+Conversation history (last 10 messages). Suggested follow-up questions based on context.
+
+### 7.11 Story Builder (`/story-builder`)
+
+LLM-guided user story creation wizard for sprint planning. Designed for Dustin (and any team member) to create well-structured stories without touching the spreadsheet.
+
+**Design:** Dark theme with animated particle network (60 canvas particles with proximity connections), gradient orbs, glass-morphism cards, SuperTruth logo + VIOLET badge, pulsing AI indicator.
+
+**4-Step Wizard:**
+
+| Step | Name | What Happens |
+|------|------|-------------|
+| 01 | Ideate | Describe idea in plain language → AI extracts epic, feature, user story |
+| 02 | Shape | Refine story, set priority/points/sprint/assignee (dropdowns from sheet) |
+| 03 | Define | AI generates acceptance criteria, set dependencies and notes |
+| 04 | Ship | Review card preview → submit pushes to Sprint Backlog in Google Sheet |
+
+**Google Sheets Integration:**
+- Sheet: `Violet_Product_Management_Workbook_Populated_v0.1.1`
+- Tabs: Sprint Dashboard, Sprint Backlog, Taxonomy Governance, Data Integrations, Release Tracker, Change Log, Demo Risk Register, KPI Tracking, Governance Rules
+- Auth: GCP service account with Editor access
+- `GET /api/stories/context` — reads existing epics/sprints/features/assignees for dropdowns
+- `POST /api/stories/assist` — LLM-powered story assistance (4 step types)
+- `POST /api/stories/submit` — appends completed story row to Sprint Backlog
+
+### 7.12 Pipeline Management (PipelinePanel.tsx)
+
+Stats grid (terms, trend points, regions, related queries, discovered terms, questions). Run button triggers the 8-step pipeline with animated progress indicator.
+
+### 7.13 Demo Mode
+
+When no real pipeline data exists, VIOLET generates realistic synthetic data for every endpoint:
+- Trend time-series: 90-day data with seeded pseudorandom for reproducibility
+- Geographic interest: MD5 hash of geo_code produces deterministic varied values per state
+- Insights: Sample anomalies spread across actual taxonomy categories
+- Questions: Template-based PAA questions per term
+- Vulnerability windows: Synthetic hourly patterns with realistic anxiety profiles
+
+Demo mode is flagged in responses (`demo_mode: true`) so the UI shows appropriate banners.
+
+---
+
+## 8. Data Model
+
+### 8.1 Core Tables
+
+**SearchTerm** — The primary entity. Every search term in the taxonomy becomes a positioned point in 3D space.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Auto-increment |
+| term | varchar(500) | Unique search string, e.g. "BRCA gene mutation" |
+| normalized_term | varchar(500) | Lowercase indexed version |
+| category | varchar(100) | High-level: pediatric_oncology, adult_oncology, treatment, rare_genetic, etc. |
+| subcategory | varchar(100) | Fine-grained: leukemia, brain_tumor, immunotherapy, etc. |
+| parent_term_id | int (FK) | Hierarchical parent relationship |
+| embedding | vector(1536) | OpenAI text-embedding-3-small |
+| x, y, z | float | 3D coordinates from UMAP reduction |
+| cluster_id | int (FK) | Semantic cluster assignment |
+
+**Cluster** — Semantic groupings auto-generated by HDBSCAN.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Auto-increment |
+| name | varchar(200) | Auto-generated from member term names |
+| description | text | Optional context |
+| centroid_x/y/z | float | 3D center point |
+| centroid_embedding | vector(1536) | Average embedding of members |
+| color | varchar(7) | Hex color for visualization |
+| size | float | Relative visual size (default 1.0) |
+| term_count | int | Cached member count |
+| avg_search_volume | float | Computed from TrendData |
+
+**TrendData** — Time-series search interest from Google Trends.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Auto-increment |
+| term_id | int (FK) | Parent search term |
+| date | date | Data point date |
+| geo_code | varchar(10) | e.g. "US", "US-CA" |
+| geo_level | varchar(20) | "country", "state", "metro" |
+| interest | int | 0-100 relative search interest |
+| granularity | varchar(20) | "daily", "weekly", "monthly" |
+
+**GeographicRegion** — US states with CDC Social Vulnerability Index.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Auto-increment |
+| geo_code | varchar(10) | Unique, e.g. "US-MS" |
+| name | varchar(100) | "Mississippi" |
+| level | varchar(20) | "state", "county", "metro", "country" |
+| latitude, longitude | float | Centroid coordinates |
+| population | int | Census data |
+| svi_overall | float | 0-1, higher = more vulnerable |
+| svi_socioeconomic | float | Poverty, unemployment, income, education |
+| svi_household_disability | float | Disability, age, single parents |
+| svi_minority_language | float | Race/ethnicity, language barriers |
+| svi_housing_transport | float | Housing type, crowding, no car |
+| uninsured_rate | float | Healthcare access |
+| pediatric_oncology_centers | int | Nearby specialized centers |
+| vulnerability_adjusted_intent | float | Interest × (1 + SVI) |
+
+### 8.2 Intelligence Tables
+
+**RelatedQuery** — Discovered related searches for automatic taxonomy expansion.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| source_term_id | int (FK) | Parent search term |
+| query | varchar(500) | The related search string |
+| query_type | varchar(50) | rising_query, top_query, rising_topic, top_topic |
+| value | varchar(100) | Raw: "+450%", "Breakout", "100" |
+| extracted_value | float | Numeric: 450, -1 (Breakout), 100 |
+| is_promoted | bool | Whether promoted to taxonomy |
+
+**HourlyPattern** — Temporal search behavior / anxiety patterns.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| term_id | int (FK) | Parent search term |
+| hourly_avg | JSON | {0: 45, 1: 52, ..., 23: 68} |
+| peak_hours | JSON | Top 3 hours, e.g. [22, 23, 21] |
+| anxiety_index | float | late_night_avg / daytime_avg (>1.0 = night-skewed) |
+
+**QuestionSurface** — Literal human question phrasing.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| source_term_id | int (FK) | Parent search term |
+| question | varchar(1000) | Full question text |
+| snippet | text | Google's answer preview |
+| source_url | varchar(2000) | URL of answering page |
+| source_type | varchar(50) | "people_also_ask" or "autocomplete" |
+| rank | int | Position in search results |
+
+**Post** — External resources positioned in 3D semantic space.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| title | varchar(500) | Resource title |
+| url | varchar(2000) | External URL |
+| source | varchar(100) | "pubmed", "clinical_trial", etc. |
+| embedding | vector(1536) | For semantic positioning |
+| x, y, z | float | 3D coordinates near relevant cluster |
+| cluster_id | int (FK) | Associated cluster |
+
+---
+
+## 9. Data Pipeline
+
+The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchestrator`.
+
+| Step | Name | What It Does |
+|------|------|-------------|
+| 1 | Load Taxonomy | Loads 749+ seed terms from taxonomy.py, creates SearchTerm records, 20 categories |
+| 2 | Generate Embeddings | OpenAI text-embedding-3-small, batches of 100, context-enriched prompts |
+| 3 | Cluster & Project | UMAP (1536→3D), HDBSCAN clustering, update coordinates and cluster assignments |
+| 4 | Fetch Trends | SerpAPI Google Trends: interest-over-time, by-region, related queries/topics. 5-year, US. Commits every 10 terms |
+| 5 | Expand Taxonomy | Promote related queries with ≥200% growth or "Breakout" status. Max 50 new terms/run |
+| 6 | Fetch Questions | SerpAPI PAA (2 pages/term) + autocomplete (10 prefix seeds). 8-15 questions/term |
+| 7 | Fetch Hourly | SerpAPI 7-day hourly data. Compute anxiety_index, peak hours, day-of-week patterns |
+| 8 | Load SDOH | CDC SVI 2020 county CSV, population-weighted state aggregation |
+
+**Clustering parameters:** UMAP (n_neighbors=10, min_dist=0.5, spread=2.0, metric=cosine), HDBSCAN (min_cluster_size=5, min_samples=3, metric=euclidean)
+
+---
+
+## 10. API Reference
+
+### 10.1 Cluster Endpoints (`/api/clusters`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List all clusters (filterable by category) |
+| GET | `/visualization` | 3D data: clusters + terms + posts with coordinates |
+| GET | `/{cluster_id}` | Detail with member terms and posts |
+
+### 10.2 Term Endpoints (`/api/terms`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Searchable, filterable term catalog |
+| GET | `/taxonomy` | Categories with counts and subcategories |
+| GET | `/{term_id}` | Full term detail |
+| GET | `/{term_id}/similar` | Semantic neighbors (pgvector cosine) |
+| GET | `/{term_id}/related` | Related queries from Google Trends |
+| GET | `/{term_id}/questions` | People Also Ask questions |
+| GET | `/discovered/all` | Auto-discovered terms from pipeline |
+
+### 10.3 Trend Endpoints (`/api/trends`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/term/{term_id}` | Time-series for single term |
+| GET | `/cluster/{cluster_id}` | Aggregated cluster trends |
+| GET | `/top` | Highest interest terms |
+| GET | `/comparison` | Side-by-side term comparison |
+| GET | `/vulnerability/{term_id}` | Hourly anxiety pattern |
+| GET | `/vulnerability/top-anxious` | Most night-searched terms |
+
+### 10.4 Geography Endpoints (`/api/geography`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/regions` | All US states (filterable by level) |
+| GET | `/regions/{geo_code}` | Region detail with SDOH |
+| GET | `/heatmap` | Interest + vulnerability for map |
+| GET | `/sdoh-summary` | SVI statistics and high-vulnerability regions |
+
+### 10.5 Insight Endpoints (`/api/insights`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Detected anomalies sorted by severity |
+| GET | `/summary` | Counts by type/severity |
+| GET | `/term/{term_id}` | Anomalies for specific term |
+| GET | `/cluster/{cluster_id}` | Anomalies in cluster |
+
+### 10.6 Question Endpoints (`/api/questions`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/top` | Most frequent questions across all terms |
+| GET | `/search?q=...` | Full-text search across all questions |
+| GET | `/stats` | Coverage statistics |
+
+### 10.7 Triangulation Endpoints (`/api/triangulate`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/term/{term_id}` | Multi-source evidence for a term |
+| GET | `/search` | Search any query across sources |
+| GET | `/clinical-trials` | ClinicalTrials.gov direct search |
+| GET | `/pubmed` | PubMed direct search |
+| GET | `/fda` | FDA openFDA |
+| GET | `/news` | Google News |
+| GET | `/scholar` | Google Scholar with citation counts |
+| GET | `/patents` | Google Patents |
+| GET | `/sources` | List all data sources |
+
+### 10.8 Compare Endpoints (`/api/compare`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/sources` | Available geo/timeframe combinations |
+| GET | `/regions` | Single term across multiple countries |
+| GET | `/top-terms` | Top N terms per region |
+| GET | `/category-comparison` | Category averages by region |
+
+### 10.9 Chat Endpoints (`/api/chat`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/` | Conversational AI (gpt-4o-mini + database context) |
+| GET | `/suggestions` | Starter questions |
+
+### 10.10 Story Builder Endpoints (`/api/stories`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/context` | Existing epics, sprints, features, assignees from Google Sheet |
+| POST | `/assist` | LLM story writing assistance (steps: idea, story, criteria, refine) |
+| POST | `/submit` | Push completed story to Sprint Backlog in Google Sheet |
+
+### 10.11 Pipeline Endpoints (`/api/pipeline`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/runs` | Pipeline execution history |
+| GET | `/runs/{run_id}` | Specific run status |
+| POST | `/run` | Trigger full pipeline (background) |
+| GET | `/stats` | Current data volume |
+
+---
+
+## 11. LLM Integration
+
+### 11.1 Models Used
+
+| Context | Model | Purpose |
+|---------|-------|---------|
+| Embeddings | text-embedding-3-small | 1536-dim semantic vectors for terms and posts |
+| Chat | gpt-4o-mini | Conversational AI with database context |
+| Story Builder | gpt-4o-mini | User story generation, acceptance criteria, sizing |
+
+### 11.2 Chat Configuration
+
+- Temperature: 0.7
+- Max tokens: 1000
+- Conversation history: last 10 messages
+- System prompt: domain-specific oncology/rare disease context
+- Data injection: real-time database summary (terms, clusters, trends, regions, spikes)
+
+### 11.3 Story Builder LLM
+
+- Temperature: 0.7
+- Max tokens: 800
+- Response format: JSON object (structured output)
+- 4 prompt templates: idea extraction, story refinement, criteria generation, review
+- Fallback: static templates when OpenAI unavailable
+
+---
+
+## 12. Security & Data Protection
+
+### 12.1 Authentication
+
+- Frontend: cookie-based password auth via Next.js middleware
+- Backend: CORS-open (Railway internal networking)
+- Google Sheets: GCP service account with scoped credentials
+- No individual user data stored; no PII processing
+
+### 12.2 Data Classification
+
+- **Public data**: Google Trends (aggregated search behavior), CDC SVI (government data), PubMed/ClinicalTrials (public databases)
+- **Proprietary data**: Taxonomy curation, clustering output, anomaly detection logic, vulnerability-adjusted scoring formula
+- **Sensitive credentials**: API keys (OpenAI, SerpAPI), database URL, GCP service account key
+
+### 12.3 What VIOLET Does NOT Store
+
+- Individual search queries from real users
+- Patient data, medical records, or PHI
+- IP addresses or user tracking data
+- Raw Google Trends data (only aggregated interest scores)
+
+### 12.4 Credential Management
+
+All secrets stored as environment variables on Railway. Never committed to git. Service account key base64-encoded for cloud deployment.
+
+---
+
+## 13. Infrastructure & Deployment
+
+### 13.1 Railway Configuration
+
+| Setting | Frontend | Backend |
+|---------|----------|---------|
+| Build | Dockerfile (node:20-alpine, multi-stage) | Dockerfile |
+| Port | 3000 | 8000 |
+| Output | Next.js standalone | Uvicorn |
+| Custom Domain | violet.supertruth.ai | (internal) |
+
+### 13.2 Environment Variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| DATABASE_URL | PostgreSQL connection (Neon, sslmode=require) | Yes |
+| OPENAI_API_KEY | Embeddings + chat + Story Builder assist | Yes |
+| SERPAPI_KEY | Google Trends and related engines | Yes |
+| BASIC_AUTH_PASSWORD | Frontend login password | Yes (prod) |
+| NEXT_PUBLIC_API_URL | Backend URL for frontend | Yes |
+| GOOGLE_SERVICE_ACCOUNT_JSON_B64 | Base64 GCP service account key | Yes (prod) |
+| GOOGLE_SHEET_ID | Sprint management spreadsheet ID | No (has default) |
+| ENVIRONMENT | "development" or "production" | No |
+| LOG_LEVEL | Default "INFO" | No |
+| AZURE_STORAGE_CONNECTION_STRING | Cloud blob storage | No |
+
+### 13.3 Database (Neon)
+
+PostgreSQL with pgvector extension on Neon serverless. IVFFlat index on embedding columns for fast cosine similarity queries. Auto-seed taxonomy on startup.
+
+---
+
+## 14. UI/UX Specification
+
+### 14.1 Design System
+
+**Typography:**
+
+| Usage | Font | Style |
+|-------|------|-------|
+| Body | system-ui, -apple-system, BlinkMacSystemFont | Regular 14px |
+| Headers | system-ui | Semibold 18-24px |
+| Labels | system-ui | Uppercase, tracking-wider, 10-11px |
+| Monospace | font-mono | Step indicators, data values |
+
+**Color Palette:**
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| Background | #0a0a0f | Page background |
+| Surface | #12121a | Panels, cards |
+| Border | #1e1e2e | Dividers, outlines |
+| Primary | #6366f1 | Buttons, active states (Indigo) |
+| Secondary | #ec4899 | Accents, highlights (Pink) |
+| Tertiary | #a855f7 | Cluster orbs, gradients (Purple) |
+| Accent | #fbbf24 | Selected items (Gold) |
+| 3D Cyan | #00d4ff | Data point start gradient |
+| 3D Pink | #ff6b9d | Data point end gradient |
+| SuperTruth Teal | #0d9488 | Logo, brand color |
+
+**Component Patterns:**
+- Glass morphism: `bg-rgba(12,12,20,0.8) backdrop-blur-12px border-rgba(255,255,255,0.1)`
+- Glow effects: `box-shadow 0 0 20px rgba(color, 0.3)`
+- Transitions: 150-300ms ease-out
+- Border radius: 12px (cards), 8px (inputs), full (badges)
+
+### 14.2 Layout
+
+**Main Dashboard:** Three-column layout
+- Left sidebar (w-72): FilterPanel, InsightsPanel tabs
+- Center (flex-1): Three.js 3D Canvas with control bar
+- Right sidebar (w-96): DetailPanel, VulnerabilityPanel tabs
+
+**Story Builder:** Single-column centered (max-w-3xl), 4-step wizard with particle background
+
+**Login:** Centered card with SuperTruth branding and legal disclaimer
+
+### 14.3 Category Colors (25 mapped)
+
+pediatric_oncology → blue-500, adult_oncology → indigo-500, rare_genetic → purple-500, rare_neurological → pink-500, clinical_trials → cyan-500, treatment → green-500, symptoms → yellow-500, diagnosis → orange-500, support → teal-500, survivorship → emerald-500, caregiver → rose-500, costs → amber-500, emerging → violet-500, integrative → lime-500, prevention → sky-500
+
+---
+
+## 15. Key Design Decisions
+
+1. **SerpAPI over pytrends** — pytrends was unreliable and rate-limited. SerpAPI provides structured JSON with consistent rate limits across Trends, PAA, Autocomplete, Scholar, News, and Patents.
+
+2. **Separate QuestionSurface vs RelatedQuery** — Questions (snippets, URLs, titles) have fundamentally different shape than related queries (growth percentages, topic types). Separate models keep the data clean.
+
+3. **UMAP + HDBSCAN** — UMAP preserves both local and global structure better than t-SNE for 3D. HDBSCAN handles noise gracefully and doesn't require specifying cluster count.
+
+4. **pgvector for semantic search** — Cosine similarity queries directly in PostgreSQL without a separate vector database. IVFFlat index keeps queries fast.
+
+5. **Batch commits every 10 terms** — Prevents massive transaction rollbacks if pipeline fails mid-run.
+
+6. **Clear-on-rerun** — Pipeline deletes old data before inserting to avoid duplicates without complex upsert logic.
+
+7. **Auto taxonomy expansion** — Related queries with ≥200% growth auto-promoted to SearchTerms. Capped at 50/run to prevent taxonomy explosion.
+
+8. **Demo mode fallback** — Every endpoint generates realistic synthetic data for demos without API keys.
+
+9. **Auto-seed on startup** — `database.py` seeds all taxonomy terms with deterministic 3D coordinates on startup. Deploying with new terms makes them appear automatically.
+
+10. **Google Sheets as sprint source of truth** — Sprint data lives in Google Sheets (not a database) because it's where stakeholders already work. Story Builder writes directly to the sheet.
+
+11. **Base64 credentials for cloud** — GCP service account key stored as base64 env var on Railway, with file path fallback for local dev. No credential files in production.
+
+---
+
+## 16. How to Brief Claude on VIOLET
+
+When starting a new session, provide this context:
+
+> Read the file VIOLET_SPEC.md in the oncology-intelligence repository root. This is the comprehensive product and technical specification for the VIOLET platform — SuperTruth Inc.'s oncology intelligence tool. It covers product vision, architecture, data models, pipeline steps, API endpoints, frontend components, UI/UX spec, security, deployment, and design decisions. After reading it, you'll be fully briefed on what VIOLET is and how it works.
 
 Or simply: "Read VIOLET_SPEC.md in the repo root and get briefed."
