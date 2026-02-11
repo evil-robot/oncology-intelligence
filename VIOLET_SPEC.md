@@ -215,6 +215,7 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 - Creates SearchTerm records if not existing
 - Sets up parent-child relationships
 - 20 categories including pediatric_oncology, adult_oncology, treatment, rare_genetic, rare_neurological, rare_autoimmune, rare_pulmonary, rare_metabolic, rare_immune, rare_cancer, clinical_trials, symptoms, diagnosis, support, survivorship, caregiver, costs, emerging, integrative, prevention
+- Notable additions: SYNGAP1 and 6 related terms (SYNGAP1 syndrome, SYNGAP1 related disorder, SYNGAP1 epilepsy, SYNGAP1 gene therapy, SYNGAP1 clinical trials, SYNGAP1 intellectual disability) in rare_neurological > developmental
 
 ### Step 2: Generate Embeddings
 - OpenAI text-embedding-3-small (1536 dimensions)
@@ -438,7 +439,7 @@ Demo mode is flagged in responses (`demo_mode: true`) so the UI can show appropr
 ## 9. ENVIRONMENT VARIABLES
 
 ### Required
-- `DATABASE_URL` — PostgreSQL connection (Neon serverless)
+- `DATABASE_URL` — PostgreSQL connection (Neon serverless, requires `sslmode=require`)
 - `OPENAI_API_KEY` — For embeddings + chat
 - `SERPAPI_KEY` — For Google Trends and related engines
 
@@ -468,6 +469,8 @@ Demo mode is flagged in responses (`demo_mode: true`) so the UI can show appropr
 
 8. **Demo mode fallback**: Every endpoint can generate realistic synthetic data, enabling development and demos without requiring API keys or pipeline runs.
 
+9. **Auto-seed taxonomy on startup**: `database.py` contains `seed_taxonomy()` which runs during `init_db()`. It loads all taxonomy terms from `pipeline/taxonomy.py` with deterministic 3D coordinates (MD5 hash-based offsets from category center positions) and creates Cluster records per category. This means deploying the code with new taxonomy terms is sufficient to make them appear in the app — no manual pipeline run needed. On subsequent startups, it detects and seeds only new terms added since the last seed.
+
 ---
 
 ## 11. FILE STRUCTURE
@@ -478,7 +481,7 @@ oncology-intelligence/
 │   ├── app/
 │   │   ├── main.py              # FastAPI app, middleware, router registration
 │   │   ├── config.py             # Pydantic Settings (env vars)
-│   │   ├── database.py           # PostgreSQL connection, schema init, SDOH seeding
+│   │   ├── database.py           # PostgreSQL connection, schema init, SDOH seeding, taxonomy auto-seed
 │   │   ├── models.py             # All SQLAlchemy models
 │   │   └── routes/
 │   │       ├── clusters.py       # Cluster listing, 3D viz data
@@ -543,7 +546,9 @@ oncology-intelligence/
 │   └── run_pipeline.py
 ├── .env.example
 ├── railway.json
-└── VIOLET_SPEC.md                # THIS FILE
+├── VIOLET_SPEC.md                # THIS FILE
+├── CLAUDE.md                     # Session instructions for Claude
+└── VIOLET_Demo_Script_SYNGAP1.docx  # Bobby's demo walkthrough for Becky Quick
 ```
 
 ---

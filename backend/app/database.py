@@ -1,5 +1,6 @@
 """Database connection and session management for Neon Postgres with pgvector."""
 
+import hashlib
 import psycopg2
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -42,6 +43,9 @@ def init_db():
 
     # Seed geographic regions if empty
     seed_geographic_regions()
+
+    # Auto-seed taxonomy terms so the app works without a manual pipeline run
+    seed_taxonomy()
 
 
 def seed_geographic_regions():
@@ -164,6 +168,150 @@ def seed_geographic_regions():
         print(f"Seeded {len(states)} US states into geographic_regions")
     except Exception as e:
         print(f"Error seeding geographic regions: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def seed_taxonomy():
+    """
+    Auto-seed taxonomy terms with synthetic 3D coordinates on startup.
+
+    This ensures the app works immediately after deploy — no manual pipeline
+    run needed. Terms get deterministic x/y/z positions grouped by category,
+    and demo mode generates synthetic trends, questions, and anxiety patterns
+    for any term that exists in the DB.
+
+    Clusters are also auto-created per category so the 3D visualization works.
+    """
+    from app.models import SearchTerm, Cluster
+    from pipeline.taxonomy import get_seed_terms
+
+    db = SessionLocal()
+    try:
+        # Check if taxonomy is already loaded (terms with coordinates exist)
+        existing_count = db.query(SearchTerm).filter(
+            SearchTerm.x.isnot(None)
+        ).count()
+        if existing_count > 0:
+            # Taxonomy already seeded — but check for new terms added since last seed
+            all_seed_terms = get_seed_terms()
+            existing_terms = {t.term for t in db.query(SearchTerm.term).all()}
+            new_terms = [t for t in all_seed_terms if t.term not in existing_terms]
+            if not new_terms:
+                return  # Everything up to date
+
+            print(f"Found {len(new_terms)} new taxonomy terms to seed")
+        else:
+            new_terms = get_seed_terms()
+            print(f"Seeding {len(new_terms)} taxonomy terms with synthetic coordinates")
+
+        # Category → base position in 3D space (spread categories across the scene)
+        category_positions = {
+            "pediatric_oncology": (0.0, 0.0, 0.0),
+            "adult_oncology": (3.0, 0.5, -1.0),
+            "treatment": (1.5, 2.5, 1.0),
+            "rare_genetic": (-2.0, 1.0, 2.0),
+            "rare_neurological": (-3.0, -1.0, 0.5),
+            "rare_autoimmune": (-1.5, -2.5, -1.0),
+            "rare_pulmonary": (2.5, -2.0, 2.5),
+            "rare_metabolic": (-4.0, 0.5, -2.0),
+            "rare_immune": (0.5, 3.0, -2.5),
+            "rare_cancer": (4.0, 1.0, 0.0),
+            "clinical_trials": (2.0, -1.0, -3.0),
+            "symptoms": (-1.0, 2.0, 3.0),
+            "diagnosis": (1.0, -3.0, 1.5),
+            "support": (3.5, 2.5, 2.0),
+            "survivorship": (-2.5, 3.0, -0.5),
+            "caregiver": (0.0, -2.0, -2.0),
+            "costs": (4.0, -1.5, -1.5),
+            "emerging": (-3.5, -2.0, 3.0),
+            "integrative": (2.0, 3.5, -1.0),
+            "prevention": (-1.5, -3.5, 0.0),
+        }
+
+        # Category colors for clusters
+        category_colors = {
+            "pediatric_oncology": "#3B82F6",
+            "adult_oncology": "#6366F1",
+            "treatment": "#22C55E",
+            "rare_genetic": "#A855F7",
+            "rare_neurological": "#EC4899",
+            "rare_autoimmune": "#F97316",
+            "rare_pulmonary": "#06B6D4",
+            "rare_metabolic": "#8B5CF6",
+            "rare_immune": "#14B8A6",
+            "rare_cancer": "#EF4444",
+            "clinical_trials": "#06B6D4",
+            "symptoms": "#EAB308",
+            "diagnosis": "#F97316",
+            "support": "#14B8A6",
+            "survivorship": "#10B981",
+            "caregiver": "#F43F5E",
+            "costs": "#F59E0B",
+            "emerging": "#7C3AED",
+            "integrative": "#84CC16",
+            "prevention": "#0EA5E9",
+        }
+
+        # Ensure clusters exist for each category
+        existing_clusters = {c.name: c for c in db.query(Cluster).all()}
+        category_cluster_map = {}
+
+        for category, (bx, by, bz) in category_positions.items():
+            cluster_name = category.replace("_", " ").title()
+            if cluster_name not in existing_clusters:
+                cluster = Cluster(
+                    name=cluster_name,
+                    description=f"Auto-generated cluster for {cluster_name}",
+                    centroid_x=bx,
+                    centroid_y=by,
+                    centroid_z=bz,
+                    color=category_colors.get(category, "#6366F1"),
+                    size=1.0,
+                    term_count=0,
+                )
+                db.add(cluster)
+                db.flush()  # Get the ID
+                existing_clusters[cluster_name] = cluster
+            category_cluster_map[category] = existing_clusters[cluster_name]
+
+        # Add new terms with deterministic coordinates
+        added = 0
+        for term_data in new_terms:
+            # Deterministic position: hash the term to get offset from category center
+            h = hashlib.md5(term_data.term.encode()).hexdigest()
+            dx = (int(h[0:4], 16) / 65535.0 - 0.5) * 2.0  # -1.0 to 1.0
+            dy = (int(h[4:8], 16) / 65535.0 - 0.5) * 2.0
+            dz = (int(h[8:12], 16) / 65535.0 - 0.5) * 2.0
+
+            base = category_positions.get(term_data.category, (0, 0, 0))
+            cluster = category_cluster_map.get(term_data.category)
+
+            db_term = SearchTerm(
+                term=term_data.term,
+                normalized_term=term_data.term.lower().strip(),
+                category=term_data.category,
+                subcategory=term_data.subcategory,
+                x=base[0] + dx,
+                y=base[1] + dy,
+                z=base[2] + dz,
+                cluster_id=cluster.id if cluster else None,
+            )
+            db.add(db_term)
+            added += 1
+
+        # Update cluster term counts
+        for category, cluster in category_cluster_map.items():
+            count = db.query(SearchTerm).filter(
+                SearchTerm.cluster_id == cluster.id
+            ).count()
+            cluster.term_count = count
+
+        db.commit()
+        print(f"Seeded {added} taxonomy terms into search_terms with synthetic 3D coordinates")
+    except Exception as e:
+        print(f"Error seeding taxonomy: {e}")
         db.rollback()
     finally:
         db.close()
