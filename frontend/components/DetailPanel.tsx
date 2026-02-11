@@ -14,7 +14,7 @@ interface TopRegion {
 
 export default function DetailPanel() {
   const selection = useSelection()
-  const selectCluster = useStore((s) => s.selectCluster)
+  const resetView = useStore((s) => s.resetView)
   const selectTerm = useStore((s) => s.selectTerm)
   const filters = useStore((s) => s.filters)
 
@@ -101,8 +101,7 @@ export default function DetailPanel() {
   }
 
   const handleClose = () => {
-    selectCluster(null)
-    selectTerm(null)
+    resetView()
   }
 
   const isCluster = 'termCount' in selected

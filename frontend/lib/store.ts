@@ -56,6 +56,7 @@ interface AppState {
   selectAndFocusCluster: (cluster: Cluster) => void
   focusOnCategory: (category: string) => void
   resetCamera: () => void
+  resetView: () => void
 
   // Data loading
   setData: (data: { clusters: Cluster[]; terms: Term[]; posts: Post[] }) => void
@@ -151,6 +152,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectAndFocusCluster: (cluster) =>
     set((state) => ({
       selection: { ...state.selection, selectedCluster: cluster, selectedTerm: null },
+      filters: { ...state.filters, clusterId: cluster.id },
       view: {
         ...state.view,
         cameraTarget: [cluster.x || 0, cluster.y || 0, cluster.z || 0],
@@ -233,6 +235,12 @@ export const useStore = create<AppState>((set, get) => ({
         cameraPosition: initialView.cameraPosition,
         cameraTarget: initialView.cameraTarget,
       },
+    })),
+  resetView: () =>
+    set((state) => ({
+      selection: initialSelection,
+      filters: { ...initialFilters, geoCode: state.filters.geoCode },
+      view: { ...state.view, cameraPosition: initialView.cameraPosition, cameraTarget: initialView.cameraTarget },
     })),
 
   // Data loading

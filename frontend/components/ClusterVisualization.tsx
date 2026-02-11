@@ -638,10 +638,13 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
   // Filter clusters — exclude clusters with missing coordinates
   const filteredClusters = useMemo(() => {
     const validClusters = clusters.filter((c) => c.x != null && c.y != null && c.z != null)
+    if (filters.clusterId) {
+      return validClusters.filter((c) => c.id === filters.clusterId)
+    }
     if (!filters.searchQuery && !filters.category) return validClusters
     const termClusterIds = new Set(terms.map((t) => t.clusterId))
     return validClusters.filter((c) => termClusterIds.has(c.id))
-  }, [clusters, terms, filters.searchQuery, filters.category])
+  }, [clusters, terms, filters.searchQuery, filters.category, filters.clusterId])
 
   // Calculate color values for gradient (based on index for now)
   const termColorValues = useMemo(() => {
@@ -700,6 +703,8 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
 export default function ClusterVisualization() {
   const [floatMode, setFloatMode] = useState(false)
   const [autoPilot, setAutoPilot] = useState(false)
+  const resetView = useStore((s) => s.resetView)
+  const hasActiveFilter = useStore((s) => s.filters.clusterId !== null || s.filters.category !== null || s.selection.selectedCluster !== null)
 
   const toggleFloatMode = () => {
     setFloatMode(!floatMode)
@@ -751,6 +756,26 @@ export default function ClusterVisualization() {
           zIndex: 50,
         }}
       >
+        {hasActiveFilter && (
+          <button
+            onClick={() => { resetView(); setAutoPilot(false); setFloatMode(false) }}
+            style={{
+              background: 'rgba(5, 5, 20, 0.8)',
+              border: '1px solid rgba(168, 85, 247, 0.5)',
+              borderRadius: 8,
+              padding: '10px 20px',
+              color: '#fff',
+              fontSize: 13,
+              fontFamily: 'ui-monospace, monospace',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.2s',
+              boxShadow: '0 0 12px rgba(168, 85, 247, 0.2)',
+            }}
+          >
+            ✦ Show All
+          </button>
+        )}
         <button
           onClick={toggleAutoPilot}
           style={{

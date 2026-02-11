@@ -352,6 +352,8 @@ Sub-components:
 - **AutoPilot** — Cinematic camera tour with Catmull-Rom spline waypoints
 - **CameraController** — Smooth lerp to store-controlled position on selection
 
+Bottom control bar buttons: "Show All" (resets to full galaxy, only visible when a cluster/category is focused), "Auto Tour" (Catmull-Rom fly-through), "Float Mode" (WASD first-person). Clicking a cluster sets `filters.clusterId` to isolate that cluster's terms and orb; `filteredClusters` useMemo respects `clusterId` to show only the focused cluster.
+
 ### FilterPanel.tsx
 - Real-time search across terms
 - Expandable category accordion (25 categories with color coding)
@@ -359,7 +361,9 @@ Sub-components:
 - Click category → camera animates to category centroid
 
 ### DetailPanel.tsx
-Appears when a term or cluster is selected. Sections:
+Appears when a term or cluster is selected. Close (X) button calls `resetView()` — clears selection, resets filters, and snaps camera back to the full galaxy overview `[0,0,15]`.
+
+Sections:
 - Header with type badge, name, category tag
 - Trend chart (Recharts LineChart, 90-day time series)
 - Similar Terms (top 5 semantic neighbors, clickable)
@@ -535,7 +539,7 @@ oncology-intelligence/
 │   │   └── Tooltip.tsx               # Smart-positioning tooltips
 │   ├── lib/
 │   │   ├── api.ts                # API client + type definitions
-│   │   └── store.ts              # Zustand global state
+│   │   └── store.ts              # Zustand global state (key actions: selectAndFocusCluster sets filters.clusterId for isolation, resetView clears selection+filters+camera)
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── next.config.js            # Standalone output, API_URL
