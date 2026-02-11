@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 0.9.6-alpha |
+| Version | 0.9.7-alpha |
 | Last Updated | February 11, 2026 |
 | Repository | oncology-intelligence |
 | Deployment | Railway.app (frontend + backend), Neon (database) |
@@ -23,6 +23,7 @@
 | 0.9.4 | Feb 11, 2026 | Story Builder, Google Sheets sprint integration, full functional spec rewrite |
 | 0.9.5 | Feb 11, 2026 | Category-aware embedding context for better cross-domain cluster separation |
 | 0.9.6 | Feb 11, 2026 | QA pass: fix HTTPException returns, null dereferences, pipeline rollback, taxonomy dedup, frontend crash bugs |
+| 0.9.7 | Feb 11, 2026 | QA phase 2: CORS restriction, chat rate limiting, WebGL memory fix, cascade deletes, pipeline transaction safety, responsive layout, stale copy cleanup |
 
 ---
 
@@ -333,9 +334,10 @@ The middleware (`frontend/middleware.ts`) protects all routes except:
 
 ### 6.3 Backend Authentication
 
-The backend API runs without direct auth (CORS open). The frontend handles authentication. This is acceptable because:
-- The backend is not directly exposed to end users
+The backend API restricts CORS to configured origins (configurable via `CORS_ORIGINS` env var, defaults to `https://violet.supertruth.ai,http://localhost:3000,http://localhost:3001`). The chat endpoint has rate limiting (20 requests/minute per IP). The frontend handles user authentication. This is acceptable because:
+- CORS restricts which origins can call the API
 - Railway networking keeps the backend service internal
+- Chat rate limiting prevents abuse
 - Future: API key auth for programmatic access
 
 ### 6.4 Google Sheets Integration Auth
@@ -764,7 +766,7 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 ### 12.1 Authentication
 
 - Frontend: cookie-based password auth via Next.js middleware
-- Backend: CORS-open (Railway internal networking)
+- Backend: CORS restricted to configured origins, chat rate-limited (20 req/min per IP)
 - Google Sheets: GCP service account with scoped credentials
 - No individual user data stored; no PII processing
 
