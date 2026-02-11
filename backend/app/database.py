@@ -71,27 +71,53 @@ def seed_geographic_regions():
             "US-WI": 0.42, "US-WY": 0.38,
         }
 
-        # --- Dedup: remove bare-abbreviation duplicates (e.g. "AL" when "US-AL" exists) ---
-        # Pipeline runs may have created regions with geo_codes like "AL" instead of "US-AL"
+        # --- Dedup: fix malformed geo_codes and remove duplicates ---
+        # Pipeline runs may have created regions with geo_codes like:
+        #   "AL" (bare abbreviation) or "US-US-AL" (double prefix)
+        # Canonical format is "US-XX". We migrate TrendData then delete dupes.
+        from app.models import TrendData as TrendDataModel
+
         all_regions = db.query(GeographicRegion).filter(
             GeographicRegion.level == "state"
         ).all()
         geo_codes_present = {r.geo_code for r in all_regions}
         removed = 0
+
         for region in all_regions:
-            # If this is a bare abbreviation (no "US-" prefix) and the proper version exists
-            if not region.geo_code.startswith("US-") and f"US-{region.geo_code}" in geo_codes_present:
-                db.delete(region)
-                removed += 1
-            # If this is a bare abbreviation and no proper version exists, fix the geo_code
+            canonical = None
+
+            # Case 1: double-prefix "US-US-XX" → canonical "US-XX"
+            if region.geo_code.startswith("US-US-"):
+                canonical = region.geo_code.replace("US-US-", "US-", 1)
+
+            # Case 2: bare abbreviation "AL" → canonical "US-AL"
             elif not region.geo_code.startswith("US-") and len(region.geo_code) == 2:
-                proper_code = f"US-{region.geo_code}"
-                region.geo_code = proper_code
-                geo_codes_present.add(proper_code)
-                removed += 1  # count as "fixed" for logging
+                canonical = f"US-{region.geo_code}"
+
+            if canonical:
+                # Migrate any TrendData rows pointing at the bad geo_code
+                migrated = db.query(TrendDataModel).filter(
+                    TrendDataModel.geo_code == region.geo_code
+                ).update(
+                    {TrendDataModel.geo_code: canonical},
+                    synchronize_session="fetch",
+                )
+                if migrated:
+                    print(f"  Migrated {migrated} trend rows: {region.geo_code} → {canonical}")
+
+                # If the canonical entry already exists, delete the dupe
+                if canonical in geo_codes_present and canonical != region.geo_code:
+                    db.delete(region)
+                    removed += 1
+                else:
+                    # No canonical entry yet — fix this one in place
+                    region.geo_code = canonical
+                    geo_codes_present.add(canonical)
+                    removed += 1  # count as "fixed" for logging
+
         if removed:
             db.commit()
-            print(f"Cleaned up {removed} duplicate/bare-abbreviation geographic regions")
+            print(f"Cleaned up {removed} duplicate/malformed geographic regions")
 
         # Update existing regions with missing SVI data
         existing_regions = db.query(GeographicRegion).filter(

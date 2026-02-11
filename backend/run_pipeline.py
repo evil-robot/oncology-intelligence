@@ -187,14 +187,19 @@ async def run_trends(db, timeframe="today 12-m", geo="US", sample_size=None):
             # Store interest by region (for US data)
             if geo == "US":
                 for record in transform_interest_by_region(result):
+                    # Normalize geo_code to canonical "US-XX" format
+                    raw_code = record["geo_code"]
+                    geo_code_full = f"US-{raw_code}" if not raw_code.startswith("US-") else raw_code
+
                     region = db.query(GeographicRegion).filter(
-                        GeographicRegion.geo_code == f"US-{record['geo_code']}"
+                        GeographicRegion.geo_code == geo_code_full
                     ).first()
 
                     if not region:
-                        centroid = STATE_CENTROIDS.get(record["geo_code"], (0, 0))
+                        state_abbr = geo_code_full.replace("US-", "")
+                        centroid = STATE_CENTROIDS.get(state_abbr, (0, 0))
                         region = GeographicRegion(
-                            geo_code=f"US-{record['geo_code']}",
+                            geo_code=geo_code_full,
                             name=record["geo_name"],
                             level="state",
                             latitude=centroid[0],
