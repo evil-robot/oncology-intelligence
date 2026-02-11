@@ -54,8 +54,8 @@ export default function ChatPanel() {
     setIsLoading(true)
 
     try {
-      // Build conversation history for context
-      const history: ChatMessage[] = messages.map((m) => ({
+      // Build conversation history for context (limit to avoid token overflow)
+      const history: ChatMessage[] = messages.slice(-20).map((m) => ({
         role: m.role,
         content: m.content
       }))

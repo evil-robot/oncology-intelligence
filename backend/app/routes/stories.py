@@ -93,17 +93,25 @@ class SheetContext(BaseModel):
 @router.get("/context", response_model=SheetContext)
 async def get_sheet_context():
     """Fetch existing epics, sprints, features from the sheet for dropdowns."""
-    service = get_sheets_service()
+    try:
+        service = get_sheets_service()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Google Sheets connection failed: {e}")
 
-    # Read Sprint Dashboard for sprint info
-    dashboard = service.spreadsheets().values().get(
-        spreadsheetId=SHEET_ID, range="'Sprint Dashboard'!A1:J20"
-    ).execute().get('values', [])
+    try:
+        # Read Sprint Dashboard for sprint info
+        dashboard = service.spreadsheets().values().get(
+            spreadsheetId=SHEET_ID, range="'Sprint Dashboard'!A1:J20"
+        ).execute().get('values', [])
 
-    # Read Sprint Backlog for epics/features/assignees
-    backlog = service.spreadsheets().values().get(
-        spreadsheetId=SHEET_ID, range="'Sprint Backlog'!A1:L100"
-    ).execute().get('values', [])
+        # Read Sprint Backlog for epics/features/assignees
+        backlog = service.spreadsheets().values().get(
+            spreadsheetId=SHEET_ID, range="'Sprint Backlog'!A1:L100"
+        ).execute().get('values', [])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Google Sheets API error: {e}")
 
     # Extract unique values (skip header row)
     epics = list(set(row[0] for row in backlog[1:] if len(row) > 0 and row[0]))
@@ -235,13 +243,16 @@ async def submit_story(story: StorySubmission):
         story.notes
     ]
 
-    service.spreadsheets().values().append(
-        spreadsheetId=SHEET_ID,
-        range="'Sprint Backlog'!A1:L1",
-        valueInputOption='RAW',
-        insertDataOption='INSERT_ROWS',
-        body={'values': [row]}
-    ).execute()
+    try:
+        service.spreadsheets().values().append(
+            spreadsheetId=SHEET_ID,
+            range="'Sprint Backlog'!A1:L1",
+            valueInputOption='RAW',
+            insertDataOption='INSERT_ROWS',
+            body={'values': [row]}
+        ).execute()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to write to Google Sheets: {e}")
 
     return {"status": "ok", "message": f"Story added to {story.sprint} backlog"}
 

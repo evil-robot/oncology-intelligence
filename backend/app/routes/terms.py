@@ -1,7 +1,7 @@
 """Search term API routes."""
 
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -101,7 +101,7 @@ async def get_term(term_id: int, db: Session = Depends(get_db)):
     """Get a specific search term."""
     term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
     if not term:
-        return {"error": "Term not found"}, 404
+        raise HTTPException(status_code=404, detail="Term not found")
     return TermResponse.model_validate(term)
 
 
@@ -114,7 +114,7 @@ async def get_similar_terms(
     """Find semantically similar terms using vector similarity."""
     term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
     if not term or term.embedding is None:
-        return {"error": "Term not found or has no embedding"}, 404
+        raise HTTPException(status_code=404, detail="Term not found or has no embedding")
 
     # Use pgvector similarity search
     similar = (
@@ -212,7 +212,7 @@ async def get_term_questions(
     """
     term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
     if not term:
-        return {"error": "Term not found"}, 404
+        raise HTTPException(status_code=404, detail="Term not found")
 
     query = db.query(QuestionSurface).filter(
         QuestionSurface.source_term_id == term_id

@@ -174,8 +174,6 @@ export const useStore = create<AppState>((set, get) => ({
       )
     }
 
-    console.log(`focusOnCategory: ${category}, found ${categoryTerms.length} terms`)
-
     if (categoryTerms.length === 0) {
       // Just set the filter even if no terms found
       set({
@@ -215,8 +213,6 @@ export const useStore = create<AppState>((set, get) => ({
     const categoryHash = category.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
     const offsetX = (categoryHash % 10) * 0.3 - 1.5
     const offsetY = ((categoryHash * 7) % 10) * 0.3 - 1.5
-
-    console.log(`Camera position: [${centerX + offsetX}, ${centerY + zoomDistance * 0.3 + offsetY}, ${centerZ + zoomDistance}]`)
 
     set({
       filters: { ...state.filters, category },

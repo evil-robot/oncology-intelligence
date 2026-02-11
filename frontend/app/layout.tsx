@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Pediatric Oncology Search Intelligence',
-  description: 'Visual exploration of pediatric oncology search trends with SDOH overlay',
+  title: 'VIOLET — Oncology & Rare Disease Intelligence',
+  description: 'Visual Intelligence Layer for Oncology Trends & Evidence Triangulation',
 }
 
 export default function RootLayout({

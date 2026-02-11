@@ -2,7 +2,7 @@
 
 from typing import Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -72,7 +72,7 @@ async def get_term_trends(
     """Get trend data for a specific term."""
     term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
     if not term:
-        return {"error": "Term not found"}, 404
+        raise HTTPException(status_code=404, detail="Term not found")
 
     cutoff = datetime.utcnow() - timedelta(days=days)
 
@@ -125,7 +125,7 @@ async def get_cluster_trends(
     """Get aggregated trend data for all terms in a cluster."""
     cluster = db.query(Cluster).filter(Cluster.id == cluster_id).first()
     if not cluster:
-        return {"error": "Cluster not found"}, 404
+        raise HTTPException(status_code=404, detail="Cluster not found")
 
     cutoff = datetime.utcnow() - timedelta(days=days)
 
@@ -175,7 +175,7 @@ async def get_cluster_trends(
         "data": [
             {
                 "date": row.date.isoformat(),
-                "interest": round(row.avg_interest, 1),
+                "interest": round(row.avg_interest or 0, 1),
             }
             for row in aggregated
         ],
@@ -216,7 +216,7 @@ async def get_top_trending(
             "term": t.term,
             "category": t.category,
             "cluster_id": t.cluster_id,
-            "avg_interest": round(t.avg_interest, 1),
+            "avg_interest": round(t.avg_interest or 0, 1),
         }
         for t in top_terms
     ]
@@ -233,7 +233,7 @@ async def compare_terms(
     ids = [int(i.strip()) for i in term_ids.split(",") if i.strip().isdigit()]
 
     if not ids or len(ids) > 5:
-        return {"error": "Provide 1-5 term IDs"}, 400
+        raise HTTPException(status_code=400, detail="Provide 1-5 term IDs")
 
     cutoff = datetime.utcnow() - timedelta(days=days)
 
@@ -306,7 +306,7 @@ async def get_vulnerability_window(
     """
     term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
     if not term:
-        return {"error": "Term not found"}, 404
+        raise HTTPException(status_code=404, detail="Term not found")
 
     pattern = db.query(HourlyPattern).filter(
         HourlyPattern.term_id == term_id

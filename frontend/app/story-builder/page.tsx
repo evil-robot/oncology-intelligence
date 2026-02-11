@@ -58,6 +58,7 @@ function ParticleField() {
     if (!ctx) return
 
     let animId: number
+    let mounted = true
     const particles: { x: number; y: number; vx: number; vy: number; r: number; a: number }[] = []
 
     const resize = () => {
@@ -80,6 +81,7 @@ function ParticleField() {
     }
 
     const draw = () => {
+      if (!mounted) return
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       // Draw connections
@@ -117,6 +119,7 @@ function ParticleField() {
     draw()
 
     return () => {
+      mounted = false
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', resize)
     }
@@ -161,6 +164,10 @@ export default function StoryBuilderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step: stepKey, input_text: inputText, context: draft }),
       })
+      if (!res.ok) {
+        setAiSuggestion(`AI assistant error (${res.status}). You can still fill in the fields manually.`)
+        return
+      }
       const data = await res.json()
       if (data.structured) {
         if (stepKey === 'idea') {

@@ -1,7 +1,7 @@
 """Cluster API routes."""
 
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -146,7 +146,7 @@ async def get_cluster(
     """Get detailed cluster information including terms and posts."""
     cluster = db.query(Cluster).filter(Cluster.id == cluster_id).first()
     if not cluster:
-        return {"error": "Cluster not found"}, 404
+        raise HTTPException(status_code=404, detail="Cluster not found")
 
     terms = db.query(SearchTerm).filter(SearchTerm.cluster_id == cluster_id).all()
     posts = db.query(Post).filter(Post.cluster_id == cluster_id).all()

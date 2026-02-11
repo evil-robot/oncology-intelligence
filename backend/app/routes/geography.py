@@ -1,7 +1,7 @@
 """Geography and SDOH API routes."""
 
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -64,7 +64,7 @@ async def get_region(
     ).first()
 
     if not region:
-        return {"error": "Region not found"}, 404
+        raise HTTPException(status_code=404, detail="Region not found")
 
     # Calculate intent intensity (average interest across all terms)
     intent = (
@@ -97,7 +97,7 @@ async def get_region(
                 "id": t.id,
                 "term": t.term,
                 "category": t.category,
-                "avg_interest": round(t.avg_interest, 1),
+                "avg_interest": round(t.avg_interest or 0, 1),
             }
             for t in top_terms
         ],

@@ -126,6 +126,8 @@ class PipelineOrchestrator:
 
         except Exception as e:
             logger.error(f"Pipeline failed: {e}")
+            self.db.rollback()
+            run = self.db.merge(run)
             run.status = "failed"
             run.errors = [str(e)]
             run.completed_at = datetime.utcnow()

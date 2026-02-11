@@ -1,12 +1,16 @@
 """Pipeline management API routes."""
 
+import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, BackgroundTasks
+from datetime import datetime
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import PipelineRun
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -66,7 +70,7 @@ async def get_pipeline_run(run_id: int, db: Session = Depends(get_db)):
     """Get status of a specific pipeline run."""
     run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
     if not run:
-        return {"error": "Run not found"}, 404
+        raise HTTPException(status_code=404, detail="Run not found")
 
     return PipelineRunResponse(
         id=run.id,
@@ -114,6 +118,18 @@ async def trigger_pipeline(
                 timeframe=config.timeframe,
                 geo=config.geo,
             )
+        except Exception as e:
+            logger.error(f"Pipeline run {run_id} failed: {e}")
+            # Update the run record with failure status
+            try:
+                failed_run = async_db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
+                if failed_run and failed_run.status != "completed":
+                    failed_run.status = "failed"
+                    failed_run.errors = [str(e)]
+                    failed_run.completed_at = datetime.utcnow()
+                    async_db.commit()
+            except Exception:
+                logger.error(f"Could not update run {run_id} status after failure")
         finally:
             async_db.close()
 

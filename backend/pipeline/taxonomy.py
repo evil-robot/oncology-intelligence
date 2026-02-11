@@ -756,8 +756,20 @@ SEED_TAXONOMY: list[TaxonomyTerm] = [
 ]
 
 
+def _deduplicate(terms: list[TaxonomyTerm]) -> list[TaxonomyTerm]:
+    """Remove duplicate terms, keeping the last occurrence (most specific)."""
+    seen: dict[str, int] = {}
+    for i, t in enumerate(terms):
+        seen[t.term.lower().strip()] = i
+    return [terms[i] for i in sorted(seen.values())]
+
+
+# Deduplicate at import time so callers never see duplicates
+SEED_TAXONOMY = _deduplicate(SEED_TAXONOMY)
+
+
 def get_seed_terms() -> list[TaxonomyTerm]:
-    """Return the seed taxonomy terms."""
+    """Return the seed taxonomy terms (deduplicated)."""
     return SEED_TAXONOMY
 
 
