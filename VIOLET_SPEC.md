@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 0.9.4-alpha |
+| Version | 0.9.5-alpha |
 | Last Updated | February 11, 2026 |
 | Repository | oncology-intelligence |
 | Deployment | Railway.app (frontend + backend), Neon (database) |
@@ -21,6 +21,7 @@
 | 0.9.0 | Feb 2026 | Added Question Surface, vulnerability window, evidence triangulation |
 | 0.9.3 | Feb 2026 | Cluster explainability, geo dedup, N+1 query fixes |
 | 0.9.4 | Feb 11, 2026 | Story Builder, Google Sheets sprint integration, full functional spec rewrite |
+| 0.9.5 | Feb 11, 2026 | Category-aware embedding context for better cross-domain cluster separation |
 
 ---
 
@@ -609,7 +610,7 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 | Step | Name | What It Does |
 |------|------|-------------|
 | 1 | Load Taxonomy | Loads 749+ seed terms from taxonomy.py, creates SearchTerm records, 20 categories |
-| 2 | Generate Embeddings | OpenAI text-embedding-3-small, batches of 100, context-enriched prompts |
+| 2 | Generate Embeddings | OpenAI text-embedding-3-small, batches of 100, **category-aware context** (each term prefixed with its disease-domain, e.g. "Rare genetic and inherited disorder: muscular dystrophy" vs "Adult cancer and oncology: lymphoma") |
 | 3 | Cluster & Project | UMAP (1536→3D), HDBSCAN clustering, update coordinates and cluster assignments |
 | 4 | Fetch Trends | SerpAPI Google Trends: interest-over-time, by-region, related queries/topics. 5-year, US. Commits every 10 terms |
 | 5 | Expand Taxonomy | Promote related queries with ≥200% growth or "Breakout" status. Max 50 new terms/run |

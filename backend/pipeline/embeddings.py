@@ -90,6 +90,42 @@ class EmbeddingGenerator:
 
         return all_embeddings
 
+    # Category-aware context prefixes for embedding disambiguation
+    CATEGORY_CONTEXT = {
+        "pediatric_oncology": "Pediatric cancer and childhood oncology",
+        "adult_oncology": "Adult cancer and oncology",
+        "treatment": "Cancer treatment and therapy",
+        "clinical_trials": "Cancer clinical trials and research",
+        "rare_genetic": "Rare genetic and inherited disorder",
+        "rare_neurological": "Rare neurological disorder",
+        "rare_autoimmune": "Rare autoimmune and inflammatory disease",
+        "rare_pulmonary": "Rare pulmonary and lung disease",
+        "rare_metabolic": "Rare metabolic disorder",
+        "rare_immune": "Rare immunodeficiency disorder",
+        "rare_cancer": "Rare cancer",
+        "symptoms": "Cancer symptoms and warning signs",
+        "diagnosis": "Cancer diagnosis and testing",
+        "caregiver": "Cancer caregiver and family support",
+        "support": "Cancer support and resources",
+        "survivorship": "Cancer survivorship and quality of life",
+        "costs": "Cancer treatment costs and insurance",
+        "emerging": "Emerging cancer therapy",
+        "integrative": "Integrative and complementary cancer care",
+        "prevention": "Cancer prevention and screening",
+    }
+
+    def contextualize(self, term: str, category: str = None) -> str:
+        """
+        Build a category-aware context string for a search term.
+
+        This prefixes the raw term with its disease-domain context so the
+        embedding model can disambiguate terms that share surface-level
+        semantics but belong to very different clinical domains (e.g.
+        'muscular dystrophy' vs 'lymphoma').
+        """
+        prefix = self.CATEGORY_CONTEXT.get(category, "Medical search query")
+        return f"{prefix}: {term}"
+
     def embed_term_with_context(self, term: str, category: str = None) -> Optional[list[float]]:
         """
         Generate embedding for a search term with category context.
@@ -103,12 +139,25 @@ class EmbeddingGenerator:
         Returns:
             Embedding vector
         """
-        if category:
-            contextualized = f"Pediatric oncology search query about {category}: {term}"
-        else:
-            contextualized = f"Pediatric oncology search query: {term}"
+        return self.embed_text(self.contextualize(term, category))
 
-        return self.embed_text(contextualized)
+    def embed_batch_with_context(
+        self,
+        terms: list[tuple[str, str]],
+        batch_size: int = 100,
+    ) -> list[Optional[list[float]]]:
+        """
+        Generate embeddings for multiple (term, category) pairs with context.
+
+        Args:
+            terms: List of (term_text, category) tuples
+            batch_size: Number of texts per API call
+
+        Returns:
+            List of embeddings (None for failed items)
+        """
+        contextualized = [self.contextualize(term, cat) for term, cat in terms]
+        return self.embed_batch(contextualized, batch_size=batch_size)
 
 
 def compute_centroid(embeddings: list[list[float]]) -> list[float]:

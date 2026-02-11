@@ -176,15 +176,17 @@ class PipelineOrchestrator:
         return db_terms
 
     async def _generate_embeddings(self, terms: list[SearchTerm]) -> None:
-        """Generate embeddings for all terms."""
+        """Generate category-aware embeddings for all terms."""
         terms_needing_embeddings = [t for t in terms if t.embedding is None]
 
         if not terms_needing_embeddings:
             logger.info("All terms already have embeddings")
             return
 
-        texts = [t.term for t in terms_needing_embeddings]
-        embeddings = self.embedding_generator.embed_batch(texts)
+        # Use (term, category) pairs so the embedding model can disambiguate
+        # terms from different disease domains (e.g. rare_genetic vs adult_oncology)
+        term_pairs = [(t.term, t.category) for t in terms_needing_embeddings]
+        embeddings = self.embedding_generator.embed_batch_with_context(term_pairs)
 
         for term, embedding in zip(terms_needing_embeddings, embeddings):
             if embedding:
