@@ -5,6 +5,8 @@ Used by the Story Builder web app for sprint planning.
 
 import os
 import json
+import base64
+import tempfile
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -18,6 +20,8 @@ settings = get_settings()
 # Google Sheets config
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "15mAK33N2hLYHnygVqqNVnY1NZxqjtXCG7LOMiE6JTUE")
 SERVICE_ACCOUNT_PATH = os.getenv("SERVICE_ACCOUNT_PATH", os.path.expanduser("~/.config/google/violet-mcp-key.json"))
+# Base64-encoded service account JSON (for Railway/cloud deployments)
+GOOGLE_SA_JSON_B64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_B64", "")
 
 # OpenAI client (reuse from config)
 ai_client = None
@@ -29,14 +33,22 @@ if settings.openai_api_key:
 
 
 def get_sheets_service():
-    """Lazy-init Google Sheets API client."""
+    """Lazy-init Google Sheets API client. Supports file path or base64 env var."""
     try:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
-        creds = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_PATH,
-            scopes=['https://www.googleapis.com/auth/spreadsheets']
-        )
+
+        scopes = ['https://www.googleapis.com/auth/spreadsheets']
+
+        if GOOGLE_SA_JSON_B64:
+            # Decode base64 credentials from env var (Railway/cloud)
+            sa_json = base64.b64decode(GOOGLE_SA_JSON_B64)
+            sa_info = json.loads(sa_json)
+            creds = service_account.Credentials.from_service_account_info(sa_info, scopes=scopes)
+        else:
+            # Read from file (local dev)
+            creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=scopes)
+
         return build('sheets', 'v4', credentials=creds)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Google Sheets connection failed: {e}")
