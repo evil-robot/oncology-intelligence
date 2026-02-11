@@ -326,6 +326,11 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 - `POST /` — Conversational AI (OpenAI gpt-4o-mini with database context)
 - `GET /suggestions` — Starter questions
 
+### Stories (`/api/stories`) — Story Builder
+- `GET /context` — Fetch existing epics, sprints, features, assignees from Google Sheet for dropdowns
+- `POST /assist` — LLM-powered story writing help (steps: idea, story, criteria, refine). Returns structured JSON with draft fields.
+- `POST /submit` — Push completed user story to Sprint Backlog tab in Google Sheet
+
 ### Pipeline (`/api/pipeline`)
 - `GET /runs` — Pipeline execution history
 - `GET /runs/{run_id}` — Specific run status
@@ -497,7 +502,8 @@ oncology-intelligence/
 │   │       ├── compare.py        # Multi-region comparison
 │   │       ├── triangulation.py  # External evidence APIs
 │   │       ├── pipeline.py       # Pipeline management
-│   │       └── chat.py           # Conversational AI
+│   │       ├── chat.py           # Conversational AI
+│   │       └── stories.py       # Story Builder API (Google Sheets + LLM assist)
 │   ├── pipeline/
 │   │   ├── orchestrator.py       # 8-step pipeline coordinator
 │   │   ├── taxonomy.py           # 749+ seed terms, 20 categories
@@ -520,6 +526,7 @@ oncology-intelligence/
 │   │   ├── page.tsx              # Main 3-column dashboard
 │   │   ├── globals.css           # Tailwind imports
 │   │   ├── login/page.tsx        # Auth page
+│   │   ├── story-builder/page.tsx # LLM-guided user story wizard (for Dustin)
 │   │   └── api/auth/route.ts     # Auth endpoint
 │   ├── components/
 │   │   ├── ClusterVisualization.tsx   # 3D engine (~850 lines)

@@ -21,7 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
 from app.database import init_db
-from app.routes import clusters, terms, trends, geography, pipeline, insights, chat, compare, triangulation, questions
+from app.routes import clusters, terms, trends, geography, pipeline, insights, chat, compare, triangulation, questions, stories
 
 # Configure logging
 logging.basicConfig(
@@ -125,6 +125,7 @@ app.include_router(compare.router, prefix="/api/compare", tags=["compare"])
 app.include_router(triangulation.router, prefix="/api/triangulate", tags=["triangulation"])
 app.include_router(questions.router, prefix="/api/questions", tags=["questions"])
 app.include_router(chat.router)
+app.include_router(stories.router, tags=["stories"])
 
 
 @app.get("/")
