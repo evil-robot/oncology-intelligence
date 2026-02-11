@@ -88,8 +88,8 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Filters & Insights */}
-        <aside className="w-72 flex-shrink-0 border-r border-border p-4 overflow-y-auto space-y-4">
+        {/* Left Sidebar - Filters & Insights (hidden on small screens) */}
+        <aside className="w-72 flex-shrink-0 border-r border-border p-4 overflow-y-auto space-y-4 hidden lg:block">
           <FilterPanel />
           <InsightsPanel />
           <VulnerabilityInsightsPanel />
@@ -127,8 +127,8 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Right Sidebar - Detail Panel, Pipeline & Data Sources */}
-        <aside className="w-96 flex-shrink-0 border-l border-border p-4 overflow-y-auto space-y-4">
+        {/* Right Sidebar - Detail Panel, Pipeline & Data Sources (hidden on small screens) */}
+        <aside className="w-96 flex-shrink-0 border-l border-border p-4 overflow-y-auto space-y-4 hidden xl:block">
           <DetailPanel />
           <VulnerabilityWindow
             selectedTermId={selectedTerm?.id ?? null}

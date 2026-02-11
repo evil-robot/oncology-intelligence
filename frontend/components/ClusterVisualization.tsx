@@ -44,6 +44,33 @@ const clusterLabelStyle: React.CSSProperties = {
   padding: '10px 16px',
 }
 
+// Shared overlay button style
+const overlayButtonBase: React.CSSProperties = {
+  borderRadius: 8,
+  padding: '10px 20px',
+  color: '#fff',
+  fontSize: 13,
+  fontFamily: 'ui-monospace, monospace',
+  cursor: 'pointer',
+  backdropFilter: 'blur(8px)',
+  transition: 'all 0.2s',
+}
+
+const overlayInstructionBase: React.CSSProperties = {
+  position: 'absolute',
+  top: 20,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: 'rgba(5, 5, 20, 0.9)',
+  borderRadius: 8,
+  padding: '12px 20px',
+  color: '#fff',
+  fontSize: 12,
+  fontFamily: 'ui-monospace, monospace',
+  zIndex: 50,
+  textAlign: 'center',
+}
+
 // Wireframe cube boundary
 function BoundingCube({ size = 12 }: { size?: number }) {
   const edges = useMemo(() => {
@@ -111,6 +138,7 @@ function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue, 
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
+  const _scaleVec = useRef(new THREE.Vector3())
 
   // Color based on trend/value - cyan to pink gradient
   const baseColor = useMemo(() => {
@@ -122,7 +150,7 @@ function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue, 
   useFrame(({ clock }) => {
     if (meshRef.current) {
       const scale = isSelected ? 2 : isHovered ? 1.6 : 1
-      meshRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.15)
+      meshRef.current.scale.lerp(_scaleVec.current.set(scale, scale, scale), 0.15)
     }
     if (glowRef.current) {
       // Subtle pulse
@@ -186,6 +214,7 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const innerRef = useRef<THREE.Mesh>(null)
+  const _scaleVec = useRef(new THREE.Vector3())
 
   const clusterColor = useMemo(() => {
     return cluster.color || COLORS.secondary
@@ -201,7 +230,7 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
     }
     if (innerRef.current) {
       const scale = isSelected ? 1.4 : isHovered ? 1.2 : 1
-      innerRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1)
+      innerRef.current.scale.lerp(_scaleVec.current.set(scale, scale, scale), 0.1)
     }
   })
 
@@ -760,16 +789,9 @@ export default function ClusterVisualization() {
           <button
             onClick={() => { resetView(); setAutoPilot(false); setFloatMode(false) }}
             style={{
+              ...overlayButtonBase,
               background: 'rgba(5, 5, 20, 0.8)',
               border: '1px solid rgba(168, 85, 247, 0.5)',
-              borderRadius: 8,
-              padding: '10px 20px',
-              color: '#fff',
-              fontSize: 13,
-              fontFamily: 'ui-monospace, monospace',
-              cursor: 'pointer',
-              backdropFilter: 'blur(8px)',
-              transition: 'all 0.2s',
               boxShadow: '0 0 12px rgba(168, 85, 247, 0.2)',
             }}
           >
@@ -779,16 +801,9 @@ export default function ClusterVisualization() {
         <button
           onClick={toggleAutoPilot}
           style={{
+            ...overlayButtonBase,
             background: autoPilot ? COLORS.primary : 'rgba(5, 5, 20, 0.8)',
             border: `1px solid ${autoPilot ? COLORS.primary : 'rgba(0, 212, 255, 0.4)'}`,
-            borderRadius: 8,
-            padding: '10px 20px',
-            color: '#fff',
-            fontSize: 13,
-            fontFamily: 'ui-monospace, monospace',
-            cursor: 'pointer',
-            backdropFilter: 'blur(8px)',
-            transition: 'all 0.2s',
           }}
         >
           {autoPilot ? '⏸ Stop Tour' : '🚀 Auto Tour'}
@@ -796,16 +811,9 @@ export default function ClusterVisualization() {
         <button
           onClick={toggleFloatMode}
           style={{
+            ...overlayButtonBase,
             background: floatMode ? COLORS.secondary : 'rgba(5, 5, 20, 0.8)',
             border: `1px solid ${floatMode ? COLORS.secondary : 'rgba(255, 107, 157, 0.4)'}`,
-            borderRadius: 8,
-            padding: '10px 20px',
-            color: '#fff',
-            fontSize: 13,
-            fontFamily: 'ui-monospace, monospace',
-            cursor: 'pointer',
-            backdropFilter: 'blur(8px)',
-            transition: 'all 0.2s',
           }}
         >
           {floatMode ? '🔓 Exit Float' : '🎮 Float Mode'}
@@ -816,19 +824,8 @@ export default function ClusterVisualization() {
       {floatMode && (
         <div
           style={{
-            position: 'absolute',
-            top: 20,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(5, 5, 20, 0.9)',
+            ...overlayInstructionBase,
             border: '1px solid rgba(255, 107, 157, 0.4)',
-            borderRadius: 8,
-            padding: '12px 20px',
-            color: '#fff',
-            fontSize: 12,
-            fontFamily: 'ui-monospace, monospace',
-            zIndex: 50,
-            textAlign: 'center',
           }}
         >
           <div style={{ marginBottom: 4, color: COLORS.secondary }}>🎮 FLOAT MODE</div>
@@ -841,19 +838,8 @@ export default function ClusterVisualization() {
       {autoPilot && (
         <div
           style={{
-            position: 'absolute',
-            top: 20,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(5, 5, 20, 0.9)',
+            ...overlayInstructionBase,
             border: '1px solid rgba(0, 212, 255, 0.4)',
-            borderRadius: 8,
-            padding: '12px 20px',
-            color: '#fff',
-            fontSize: 12,
-            fontFamily: 'ui-monospace, monospace',
-            zIndex: 50,
-            textAlign: 'center',
           }}
         >
           <div style={{ marginBottom: 4, color: COLORS.primary }}>🚀 AUTO TOUR</div>

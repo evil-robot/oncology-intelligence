@@ -88,15 +88,19 @@ export default function ExplainerPanel() {
 
   // Check if user has seen the guide before
   useEffect(() => {
-    const seen = localStorage.getItem('posi-guide-seen')
-    if (!seen) {
-      setHasSeenGuide(false)
+    try {
+      const seen = localStorage.getItem('posi-guide-seen')
+      if (!seen) {
+        setHasSeenGuide(false)
+      }
+    } catch {
+      // localStorage unavailable (privacy mode)
     }
   }, [])
 
   const handleClose = () => {
     setIsOpen(false)
-    localStorage.setItem('posi-guide-seen', 'true')
+    try { localStorage.setItem('posi-guide-seen', 'true') } catch { /* noop */ }
     setHasSeenGuide(true)
   }
 

@@ -1,1 +1,1 @@
-# Pediatric Oncology Intelligence Backend
+# VIOLET — Oncology & Rare Disease Intelligence Backend

@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     basic_auth_username: str = ""
     basic_auth_password: str = ""
 
+    # CORS — comma-separated allowed origins (default: localhost + supertruth.ai)
+    cors_origins: str = "https://violet.supertruth.ai,http://localhost:3000,http://localhost:3001"
+
     # Embedding config
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536

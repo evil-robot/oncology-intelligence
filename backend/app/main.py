@@ -101,18 +101,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for frontend
+# CORS middleware — restrict to known origins (configurable via CORS_ORIGINS env var)
+cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for Railway deployment
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Note: Basic Auth removed from backend - frontend handles authentication
-# The frontend login page protects access to the entire application
-logger.info("Backend API running without direct auth (frontend handles authentication)")
+logger.info(f"CORS allowed origins: {cors_origins}")
 
 # Include routers
 app.include_router(clusters.router, prefix="/api/clusters", tags=["clusters"])

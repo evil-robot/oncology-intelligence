@@ -1,4 +1,4 @@
-"""SQLAlchemy models for the pediatric oncology intelligence system."""
+"""SQLAlchemy models for the VIOLET oncology & rare disease intelligence system."""
 
 from datetime import datetime
 from sqlalchemy import (
@@ -43,9 +43,9 @@ class SearchTerm(Base):
 
     # Relationships
     cluster = relationship("Cluster", back_populates="terms")
-    trend_data = relationship("TrendData", back_populates="term")
+    trend_data = relationship("TrendData", back_populates="term", cascade="all, delete-orphan")
     parent = relationship("SearchTerm", remote_side=[id], foreign_keys=[parent_term_id])
-    related_queries = relationship("RelatedQuery", foreign_keys="RelatedQuery.source_term_id", back_populates="source_term")
+    related_queries = relationship("RelatedQuery", foreign_keys="RelatedQuery.source_term_id", back_populates="source_term", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_search_terms_embedding", embedding, postgresql_using="ivfflat"),
@@ -80,9 +80,9 @@ class Cluster(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
-    terms = relationship("SearchTerm", back_populates="cluster")
-    posts = relationship("Post", back_populates="cluster")
+    # Relationships — nullify term/post cluster_id on cluster delete (not cascade delete)
+    terms = relationship("SearchTerm", back_populates="cluster", passive_deletes=True)
+    posts = relationship("Post", back_populates="cluster", passive_deletes=True)
 
 
 class TrendData(Base):

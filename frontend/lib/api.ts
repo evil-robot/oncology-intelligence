@@ -1,5 +1,5 @@
 /**
- * API client for the Pediatric Oncology Intelligence backend.
+ * API client for the VIOLET (Oncology & Rare Disease Intelligence) backend.
  */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'

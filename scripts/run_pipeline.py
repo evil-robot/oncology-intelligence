@@ -30,7 +30,7 @@ if not DATABASE_URL or not OPENAI_API_KEY:
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 print("=" * 60)
-print("Pediatric Oncology Intelligence - Data Pipeline")
+print("VIOLET — Oncology & Rare Disease Intelligence Pipeline")
 print("=" * 60)
 
 conn = psycopg2.connect(DATABASE_URL)

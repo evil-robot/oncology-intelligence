@@ -158,7 +158,7 @@ export default function ChatPanel() {
                 <div className="text-center py-4">
                   <Sparkles className="w-10 h-10 text-primary mx-auto mb-3" />
                   <p className="text-sm text-gray-400">
-                    Ask me anything about pediatric oncology search trends, regional patterns, or emerging topics.
+                    Ask me anything about oncology & rare disease search trends, regional patterns, or emerging topics.
                   </p>
                 </div>
 

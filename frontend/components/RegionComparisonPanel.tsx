@@ -8,7 +8,7 @@ interface RegionComparisonPanelProps {
   selectedRegions?: string[]
 }
 
-export default function RegionComparisonPanel({ selectedRegions = ['US', 'GB'] }: RegionComparisonPanelProps) {
+export default function RegionComparisonPanel({ selectedRegions = ['US'] }: RegionComparisonPanelProps) {
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [topTerms, setTopTerms] = useState<TopTermComparison[]>([])
   const [categoryComparison, setCategoryComparison] = useState<CategoryComparison[]>([])

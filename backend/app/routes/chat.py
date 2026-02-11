@@ -1,9 +1,11 @@
 """
 Chat endpoint for conversational AI interface.
-Allows researchers, doctors, and parents to ask questions about the pediatric oncology search data.
+Allows researchers, clinicians, patients, and caregivers to ask questions about oncology & rare disease search data.
 """
 
-from fastapi import APIRouter, HTTPException
+import time
+import collections
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List
 import json
@@ -12,6 +14,11 @@ from ..database import get_db_connection
 from ..config import get_settings
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+# Simple in-memory rate limiter: max 20 requests per IP per minute
+_RATE_LIMIT = 20
+_RATE_WINDOW = 60  # seconds
+_rate_buckets: dict[str, collections.deque] = {}
 
 settings = get_settings()
 
@@ -181,9 +188,24 @@ Always maintain a supportive, informative tone. If asked medical questions, remi
 Current data context will be provided with each query."""
 
 
+def _check_rate_limit(client_ip: str) -> None:
+    """Raise 429 if client exceeds rate limit."""
+    now = time.time()
+    if client_ip not in _rate_buckets:
+        _rate_buckets[client_ip] = collections.deque()
+    bucket = _rate_buckets[client_ip]
+    # Expire old entries
+    while bucket and bucket[0] < now - _RATE_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= _RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in a minute.")
+    bucket.append(now)
+
+
 @router.post("/", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, raw_request: Request):
     """Process a chat message and return an AI-generated response."""
+    _check_rate_limit(raw_request.client.host if raw_request.client else "unknown")
 
     # Gather data context (needed for both AI and fallback responses)
     context = get_data_context(request.context_filter)

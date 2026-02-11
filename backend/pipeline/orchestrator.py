@@ -265,11 +265,13 @@ class PipelineOrchestrator:
         terms = self.db.query(SearchTerm).all()
         total = len(terms)
 
-        # Clear old trend data to avoid duplicates on re-run
+        # Delete old data BEFORE fetching to avoid duplicates.
+        # If the pipeline fails mid-fetch, the orchestrator's try/except
+        # will rollback the entire transaction, preserving the old data.
         logger.info("Clearing old trend data before refresh...")
         self.db.query(TrendData).delete()
         self.db.query(RelatedQuery).delete()
-        self.db.commit()
+        self.db.flush()  # flush within transaction, not commit — rollback-safe
 
         for i, term in enumerate(terms):
             logger.info(f"Fetching trends {i + 1}/{total}: {term.term}")
@@ -353,10 +355,10 @@ class PipelineOrchestrator:
                 )
                 self.db.add(rt)
 
-            # Commit every 10 terms to avoid large transaction
+            # Flush every 10 terms to free session memory (stays in transaction)
             if (i + 1) % 10 == 0:
-                self.db.commit()
-                logger.info(f"Committed batch {i + 1}/{total}")
+                self.db.flush()
+                logger.info(f"Flushed batch {i + 1}/{total}")
 
         self.db.commit()
         logger.info(f"Fetched trends for {total} terms")
