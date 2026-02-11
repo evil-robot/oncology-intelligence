@@ -127,16 +127,16 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({
       view: {
         ...state.view,
-        cameraTarget: [cluster.x, cluster.y, cluster.z],
-        cameraPosition: [cluster.x, cluster.y, cluster.z + 5],
+        cameraTarget: [cluster.x || 0, cluster.y || 0, cluster.z || 0],
+        cameraPosition: [cluster.x || 0, cluster.y || 0, (cluster.z || 0) + 5],
       },
     })),
   focusOnTerm: (term) =>
     set((state) => ({
       view: {
         ...state.view,
-        cameraTarget: [term.x, term.y, term.z],
-        cameraPosition: [term.x, term.y + 1, term.z + 4],
+        cameraTarget: [term.x || 0, term.y || 0, term.z || 0],
+        cameraPosition: [term.x || 0, (term.y || 0) + 1, (term.z || 0) + 4],
       },
     })),
   selectAndFocusTerm: (term) =>
@@ -144,8 +144,8 @@ export const useStore = create<AppState>((set, get) => ({
       selection: { ...state.selection, selectedTerm: term, selectedCluster: null },
       view: {
         ...state.view,
-        cameraTarget: [term.x, term.y, term.z],
-        cameraPosition: [term.x, term.y + 1, term.z + 4],
+        cameraTarget: [term.x || 0, term.y || 0, term.z || 0],
+        cameraPosition: [term.x || 0, (term.y || 0) + 1, (term.z || 0) + 4],
       },
     })),
   selectAndFocusCluster: (cluster) =>
@@ -153,8 +153,8 @@ export const useStore = create<AppState>((set, get) => ({
       selection: { ...state.selection, selectedCluster: cluster, selectedTerm: null },
       view: {
         ...state.view,
-        cameraTarget: [cluster.x, cluster.y, cluster.z],
-        cameraPosition: [cluster.x, cluster.y, cluster.z + 5],
+        cameraTarget: [cluster.x || 0, cluster.y || 0, cluster.z || 0],
+        cameraPosition: [cluster.x || 0, cluster.y || 0, (cluster.z || 0) + 5],
       },
     })),
   focusOnCategory: (category) => {

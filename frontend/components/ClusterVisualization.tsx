@@ -609,9 +609,9 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
   const setHoveredTerm = useStore((s) => s.setHoveredTerm)
   const [hoveredClusterId, setHoveredClusterId] = useState<number | null>(null)
 
-  // Filter terms
+  // Filter terms — always exclude terms with missing coordinates to prevent THREE.js crashes
   const terms = useMemo(() => {
-    let filtered = allTerms
+    let filtered = allTerms.filter((t) => t.x != null && t.y != null && t.z != null)
 
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase()
@@ -634,11 +634,12 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
     return filtered
   }, [allTerms, filters.searchQuery, filters.category, filters.clusterId])
 
-  // Filter clusters
+  // Filter clusters — exclude clusters with missing coordinates
   const filteredClusters = useMemo(() => {
-    if (!filters.searchQuery && !filters.category) return clusters
+    const validClusters = clusters.filter((c) => c.x != null && c.y != null && c.z != null)
+    if (!filters.searchQuery && !filters.category) return validClusters
     const termClusterIds = new Set(terms.map((t) => t.clusterId))
-    return clusters.filter((c) => termClusterIds.has(c.id))
+    return validClusters.filter((c) => termClusterIds.has(c.id))
   }, [clusters, terms, filters.searchQuery, filters.category])
 
   // Calculate color values for gradient (based on index for now)

@@ -262,64 +262,6 @@ async def compare_terms(
     return result
 
 
-@router.get("/vulnerability/{term_id}")
-async def get_vulnerability_window(
-    term_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Get the 'vulnerability window' for a term — hourly search patterns
-    that reveal when people are searching, especially late-night anxiety searches.
-    """
-    term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
-    if not term:
-        return {"error": "Term not found"}, 404
-
-    pattern = db.query(HourlyPattern).filter(
-        HourlyPattern.term_id == term_id
-    ).first()
-
-    if not pattern:
-        # Generate demo data
-        import math
-        import random
-        random.seed(term_id)
-        hourly = {}
-        for h in range(24):
-            # Simulate: higher at night for medical terms
-            base = 30 + 20 * math.sin((h - 14) * math.pi / 12)  # Peak at 2am
-            hourly[h] = round(max(5, base + random.gauss(0, 5)), 1)
-
-        late_vals = [hourly[h] for h in [23, 0, 1, 2, 3, 4]]
-        day_vals = [hourly[h] for h in range(8, 19)]
-        late_avg = round(sum(late_vals) / len(late_vals), 1)
-        day_avg = round(sum(day_vals) / len(day_vals), 1)
-
-        return {
-            "term_id": term.id,
-            "term": term.term,
-            "hourly_avg": hourly,
-            "day_of_week": {"Mon": 35, "Tue": 38, "Wed": 40, "Thu": 37, "Fri": 32, "Sat": 28, "Sun": 30},
-            "peak_hours": sorted(hourly, key=hourly.get, reverse=True)[:3],
-            "anxiety_index": round(late_avg / max(day_avg, 0.1), 2),
-            "late_night_avg": late_avg,
-            "daytime_avg": day_avg,
-            "demo_mode": True,
-        }
-
-    return {
-        "term_id": term.id,
-        "term": term.term,
-        "hourly_avg": pattern.hourly_avg,
-        "day_of_week": pattern.day_of_week_avg,
-        "peak_hours": pattern.peak_hours,
-        "anxiety_index": pattern.anxiety_index,
-        "late_night_avg": pattern.late_night_avg,
-        "daytime_avg": pattern.daytime_avg,
-        "demo_mode": False,
-    }
-
-
 @router.get("/vulnerability/top-anxious")
 async def get_most_anxious_terms(
     db: Session = Depends(get_db),
@@ -351,3 +293,59 @@ async def get_most_anxious_terms(
         }
         for pattern, term in patterns
     ]
+
+
+@router.get("/vulnerability/{term_id}")
+async def get_vulnerability_window(
+    term_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get the 'vulnerability window' for a term — hourly search patterns
+    that reveal when people are searching, especially late-night anxiety searches.
+    """
+    term = db.query(SearchTerm).filter(SearchTerm.id == term_id).first()
+    if not term:
+        return {"error": "Term not found"}, 404
+
+    pattern = db.query(HourlyPattern).filter(
+        HourlyPattern.term_id == term_id
+    ).first()
+
+    if not pattern:
+        import math
+        import random
+        random.seed(term_id)
+        hourly = {}
+        for h in range(24):
+            base = 30 + 20 * math.sin((h - 14) * math.pi / 12)
+            hourly[h] = round(max(5, base + random.gauss(0, 5)), 1)
+
+        late_vals = [hourly[h] for h in [23, 0, 1, 2, 3, 4]]
+        day_vals = [hourly[h] for h in range(8, 19)]
+        late_avg = round(sum(late_vals) / len(late_vals), 1)
+        day_avg = round(sum(day_vals) / len(day_vals), 1)
+
+        return {
+            "term_id": term.id,
+            "term": term.term,
+            "hourly_avg": hourly,
+            "day_of_week": {"Mon": 35, "Tue": 38, "Wed": 40, "Thu": 37, "Fri": 32, "Sat": 28, "Sun": 30},
+            "peak_hours": sorted(hourly, key=hourly.get, reverse=True)[:3],
+            "anxiety_index": round(late_avg / max(day_avg, 0.1), 2),
+            "late_night_avg": late_avg,
+            "daytime_avg": day_avg,
+            "demo_mode": True,
+        }
+
+    return {
+        "term_id": term.id,
+        "term": term.term,
+        "hourly_avg": pattern.hourly_avg,
+        "day_of_week": pattern.day_of_week_avg,
+        "peak_hours": pattern.peak_hours,
+        "anxiety_index": pattern.anxiety_index,
+        "late_night_avg": pattern.late_night_avg,
+        "daytime_avg": pattern.daytime_avg,
+        "demo_mode": False,
+    }
