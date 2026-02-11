@@ -142,9 +142,8 @@ async def get_heatmap_data(
         GeographicRegion.level == "state"
     ).all()
 
-    # Check if we have any trend data at all
-    trend_count = db.query(TrendData).count()
-    demo_mode = trend_count == 0
+    # Fast existence check instead of full COUNT(*)
+    demo_mode = not db.query(TrendData.id).limit(1).first()
 
     # Build term filter
     term_filter = []
@@ -165,20 +164,24 @@ async def get_heatmap_data(
         )
         term_filter = [t[0] for t in term_ids]
 
+    # Calculate interest in a single GROUP BY query instead of N+1
+    interest_map: dict[str, float] = {}
+    if not demo_mode:
+        interest_query = db.query(
+            TrendData.geo_code,
+            func.avg(TrendData.interest).label("avg_interest"),
+        )
+        if term_filter:
+            interest_query = interest_query.filter(TrendData.term_id.in_(term_filter))
+        interest_rows = interest_query.group_by(TrendData.geo_code).all()
+        interest_map = {row.geo_code: float(row.avg_interest or 0) for row in interest_rows}
+
     result = []
     for region in regions:
         if demo_mode:
-            # Generate demo interest data
             interest = generate_demo_regional_interest(region.geo_code, term_id or cluster_id)
         else:
-            # Calculate interest for this region from real data
-            interest_query = db.query(func.avg(TrendData.interest)).filter(
-                TrendData.geo_code == region.geo_code
-            )
-            if term_filter:
-                interest_query = interest_query.filter(TrendData.term_id.in_(term_filter))
-
-            interest = interest_query.scalar() or 0
+            interest = interest_map.get(region.geo_code, 0)
 
         result.append({
             "geo_code": region.geo_code,
@@ -188,7 +191,6 @@ async def get_heatmap_data(
             "interest": round(interest, 1) if interest else 0,
             "svi_overall": region.svi_overall,
             "population": region.population,
-            # Computed metric: interest adjusted by vulnerability
             "vulnerability_adjusted_intent": (
                 round(interest * (1 + (region.svi_overall or 0)), 1)
                 if interest else 0
