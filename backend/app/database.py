@@ -71,6 +71,28 @@ def seed_geographic_regions():
             "US-WI": 0.42, "US-WY": 0.38,
         }
 
+        # --- Dedup: remove bare-abbreviation duplicates (e.g. "AL" when "US-AL" exists) ---
+        # Pipeline runs may have created regions with geo_codes like "AL" instead of "US-AL"
+        all_regions = db.query(GeographicRegion).filter(
+            GeographicRegion.level == "state"
+        ).all()
+        geo_codes_present = {r.geo_code for r in all_regions}
+        removed = 0
+        for region in all_regions:
+            # If this is a bare abbreviation (no "US-" prefix) and the proper version exists
+            if not region.geo_code.startswith("US-") and f"US-{region.geo_code}" in geo_codes_present:
+                db.delete(region)
+                removed += 1
+            # If this is a bare abbreviation and no proper version exists, fix the geo_code
+            elif not region.geo_code.startswith("US-") and len(region.geo_code) == 2:
+                proper_code = f"US-{region.geo_code}"
+                region.geo_code = proper_code
+                geo_codes_present.add(proper_code)
+                removed += 1  # count as "fixed" for logging
+        if removed:
+            db.commit()
+            print(f"Cleaned up {removed} duplicate/bare-abbreviation geographic regions")
+
         # Update existing regions with missing SVI data
         existing_regions = db.query(GeographicRegion).filter(
             GeographicRegion.svi_overall.is_(None)
