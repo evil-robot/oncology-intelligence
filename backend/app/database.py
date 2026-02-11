@@ -89,12 +89,8 @@ def seed_geographic_regions():
             db.commit()
             print(f"Updated SVI data for {len(existing_regions)} existing regions")
 
-        # Check if we have any regions at all
-        count = db.query(GeographicRegion).count()
-        if count > 0:
-            return  # Already seeded
-
         # US state data with centroids and demo SVI values
+        # Always run — creates missing states AND fixes abbreviated names
         states = [
             ("US-AL", "Alabama", 32.806671, -86.791130, 5024279, 0.62),
             ("US-AK", "Alaska", 61.370716, -152.404419, 733391, 0.38),
@@ -148,24 +144,51 @@ def seed_geographic_regions():
             ("US-WY", "Wyoming", 42.755966, -107.302490, 576851, 0.38),
         ]
 
+        created = 0
+        fixed = 0
         for geo_code, name, lat, lon, pop, svi in states:
-            region = GeographicRegion(
-                geo_code=geo_code,
-                name=name,
-                level="state",
-                latitude=lat,
-                longitude=lon,
-                population=pop,
-                svi_overall=svi,
-                svi_socioeconomic=svi * 0.9,
-                svi_household_disability=svi * 1.1,
-                svi_minority_language=svi * 0.8,
-                svi_housing_transport=svi * 1.0,
-            )
-            db.add(region)
+            existing = db.query(GeographicRegion).filter(
+                GeographicRegion.geo_code == geo_code
+            ).first()
+
+            if existing:
+                # Fix abbreviated names (e.g. "AL" → "Alabama")
+                if existing.name != name and len(existing.name) <= 3:
+                    existing.name = name
+                    fixed += 1
+                # Backfill missing fields
+                if existing.latitude is None:
+                    existing.latitude = lat
+                if existing.longitude is None:
+                    existing.longitude = lon
+                if existing.population is None:
+                    existing.population = pop
+                if existing.svi_overall is None:
+                    existing.svi_overall = svi
+                    existing.svi_socioeconomic = svi * 0.9
+                    existing.svi_household_disability = svi * 1.1
+                    existing.svi_minority_language = svi * 0.8
+                    existing.svi_housing_transport = svi * 1.0
+            else:
+                region = GeographicRegion(
+                    geo_code=geo_code,
+                    name=name,
+                    level="state",
+                    latitude=lat,
+                    longitude=lon,
+                    population=pop,
+                    svi_overall=svi,
+                    svi_socioeconomic=svi * 0.9,
+                    svi_household_disability=svi * 1.1,
+                    svi_minority_language=svi * 0.8,
+                    svi_housing_transport=svi * 1.0,
+                )
+                db.add(region)
+                created += 1
 
         db.commit()
-        print(f"Seeded {len(states)} US states into geographic_regions")
+        if created or fixed:
+            print(f"Geographic regions: {created} created, {fixed} names fixed")
     except Exception as e:
         print(f"Error seeding geographic regions: {e}")
         db.rollback()
