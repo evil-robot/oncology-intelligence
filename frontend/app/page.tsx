@@ -12,6 +12,7 @@ import StatsBar from '@/components/StatsBar'
 import InsightsPanel from '@/components/InsightsPanel'
 import ExplainerPanel from '@/components/ExplainerPanel'
 import ChatPanel from '@/components/ChatPanel'
+import ClusterComparisonPopup from '@/components/ClusterComparisonPopup'
 import DataSourcesPanel from '@/components/DataSourcesPanel'
 import PipelinePanel from '@/components/PipelinePanel'
 import VulnerabilityInsightsPanel from '@/components/VulnerabilityInsightsPanel'
@@ -158,6 +159,9 @@ export default function HomePage() {
 
       {/* AI Chat Panel */}
       <ChatPanel />
+
+      {/* Cluster Comparison Popup (auto-shows when two clusters selected) */}
+      <ClusterComparisonPopup />
     </div>
   )
 }

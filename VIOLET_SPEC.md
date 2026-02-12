@@ -215,6 +215,7 @@ oncology-intelligence/
 │   │       ├── triangulation.py  # External evidence APIs
 │   │       ├── pipeline.py       # Pipeline management
 │   │       ├── chat.py           # Conversational AI
+│   │       ├── cluster_compare.py # Cluster pair comparison + LLM explanation
 │   │       └── stories.py        # Story Builder (DB-backed CRUD + Kanban board + LLM)
 │   ├── pipeline/
 │   │   ├── orchestrator.py       # 8-step pipeline coordinator
@@ -250,6 +251,7 @@ oncology-intelligence/
 │   │   ├── DataSourcesPanel.tsx      # Evidence triangulation
 │   │   ├── PipelinePanel.tsx         # Pipeline control + stats
 │   │   ├── ChatPanel.tsx             # AI conversation
+│   │   ├── ClusterComparisonPopup.tsx # AI-explained cluster pair comparison
 │   │   ├── ExplainerPanel.tsx        # Guided tour modal
 │   │   ├── RegionComparisonPanel.tsx # Multi-region analysis
 │   │   ├── ViewControls.tsx          # Label/connection toggles
@@ -502,7 +504,17 @@ Board shows 5 columns (archived hidden). Status transitions enforced by API.
 
 Stats grid (terms, trend points, regions, related queries, discovered terms, questions). Run button triggers the 8-step pipeline with animated progress indicator.
 
-### 7.14 Demo Mode
+### 7.14 Cluster Comparison Popup (ClusterComparisonPopup.tsx)
+
+Fixed-position overlay that auto-appears when both comparison clusters (A and B) are selected in the 3D view. Calls `POST /api/clusters/compare` to fetch proximity metrics and an AI-generated narrative explanation.
+
+- **Auto-trigger:** Watches `useComparison()` — popup shows when both `clusterA` and `clusterB` are non-null.
+- **Auto-dismiss:** Clears when comparison is cleared (ESC / click empty / "Show All").
+- **Session cache:** `useRef<Map>` keyed by `"${aId}-${bId}"` — re-selecting the same pair shows cached result instantly.
+- **Layout:** `position: fixed`, centered, `z-index: 50`, 480px wide, glass morphism background (`rgba(5,5,20,0.92)` + `backdrop-filter: blur(16px)`), cyan/pink badges matching SelectionRing colors.
+- **Content:** Header with A↔B cluster names, proximity index gauge (red→yellow→green), term count scale, shared category pills (purple), AI explanation body.
+
+### 7.15 Demo Mode
 
 When no real pipeline data exists, VIOLET generates realistic synthetic data for every endpoint:
 - Trend time-series: 90-day data with seeded pseudorandom for reproducibility
@@ -784,7 +796,23 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 | POST | `/sprints` | Create sprint |
 | PATCH | `/sprints/{id}` | Update sprint |
 
-### 10.11 Pipeline Endpoints (`/api/pipeline`)
+### 10.11 Cluster Comparison Endpoint (`/api/clusters/compare`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/compare` | Compare two clusters — returns proximity metrics + AI-generated explanation |
+
+**Request body:** `{ cluster_a_id: int, cluster_b_id: int }`
+
+**Response:** `cluster_a` & `cluster_b` summaries (id, name, term_count, avg_search_volume, top_categories, top_terms), `metrics` (proximity_index 0-100, spatial_proximity 0-100, euclidean_distance_3d, shared_categories, shared_subcategories), `explanation` (AI narrative or template fallback), `fallback` (bool).
+
+**Proximity Index** (0-100): cosine similarity of `centroid_embedding` vectors via pgvector `<=>`. Falls back to numpy when embeddings are null.
+
+**Spatial Proximity** (0-100): Euclidean distance of centroid_x/y/z normalized against ~24.2-unit bounding cube diagonal.
+
+**LLM:** gpt-4o-mini, temp 0.6, max_tokens 400. Fallback template when OpenAI is unavailable.
+
+### 10.12 Pipeline Endpoints (`/api/pipeline`)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -804,6 +832,7 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 | Embeddings | text-embedding-3-small | 1536-dim semantic vectors for terms and posts |
 | Chat | gpt-4o-mini | Conversational AI with database context |
 | Story Builder | gpt-4o-mini | User story generation, acceptance criteria, sizing |
+| Cluster Compare | gpt-4o-mini | Narrative explanation of cluster pair proximity (temp 0.6, max 400 tokens) |
 
 ### 11.2 Chat Configuration
 

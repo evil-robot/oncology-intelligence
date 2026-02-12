@@ -181,6 +181,32 @@ export interface CategoryComparison {
   }>
 }
 
+// Cluster comparison
+export interface ClusterCompareSummary {
+  id: number
+  name: string
+  term_count: number
+  avg_search_volume: number | null
+  top_categories: string[]
+  top_terms: string[]
+}
+
+export interface ClusterCompareMetrics {
+  proximity_index: number
+  spatial_proximity: number
+  euclidean_distance_3d: number
+  shared_categories: string[]
+  shared_subcategories: string[]
+}
+
+export interface ClusterCompareResponse {
+  cluster_a: ClusterCompareSummary
+  cluster_b: ClusterCompareSummary
+  metrics: ClusterCompareMetrics
+  explanation: string
+  fallback: boolean
+}
+
 // API functions
 export const api = {
   // Visualization
@@ -286,6 +312,13 @@ export const api = {
     regions.forEach(r => params.append('regions', r))
     return fetchApi<CategoryComparison[]>(`/api/compare/category-comparison?${params.toString()}`)
   },
+
+  // Cluster comparison
+  compareClusterPair: (aId: number, bId: number) =>
+    fetchApi<ClusterCompareResponse>('/api/clusters/compare', {
+      method: 'POST',
+      body: { cluster_a_id: aId, cluster_b_id: bId },
+    }),
 }
 
 export default api
