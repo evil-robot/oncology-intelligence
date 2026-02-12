@@ -65,6 +65,7 @@ interface AppState {
   selectAndFocusTerm: (term: Term) => void
   selectAndFocusCluster: (cluster: Cluster) => void
   focusOnCategory: (category: string) => void
+  focusOnSubcategory: (subcategory: string) => void
   resetCamera: () => void
   resetView: () => void
 
@@ -262,6 +263,64 @@ export const useStore = create<AppState>((set, get) => ({
 
     set({
       filters: { ...state.filters, category },
+      selection: { ...state.selection, selectedCluster: null, selectedTerm: null },
+      view: {
+        ...state.view,
+        cameraTarget: [centerX, centerY, centerZ],
+        cameraPosition: [centerX + offsetX, centerY + zoomDistance * 0.3 + offsetY, centerZ + zoomDistance],
+      },
+    })
+  },
+  focusOnSubcategory: (subcategory) => {
+    const state = get()
+    const displayName = subcategory.replace(/_/g, ' ')
+
+    // Find terms matching this subcategory
+    let subTerms = state.terms.filter(
+      (t) => t.subcategory === subcategory
+    )
+    if (subTerms.length === 0) {
+      subTerms = state.terms.filter(
+        (t) => t.subcategory?.toLowerCase() === subcategory.toLowerCase()
+      )
+    }
+
+    if (subTerms.length === 0) {
+      // No matching terms — just set search query so the user sees the filter
+      set({
+        filters: { ...state.filters, searchQuery: displayName },
+      })
+      return
+    }
+
+    const termsWithCoords = subTerms.filter(
+      (t) => t.x !== 0 || t.y !== 0 || t.z !== 0
+    )
+    const validTerms = termsWithCoords.length > 0 ? termsWithCoords : subTerms
+
+    const sumX = validTerms.reduce((acc, t) => acc + (t.x || 0), 0)
+    const sumY = validTerms.reduce((acc, t) => acc + (t.y || 0), 0)
+    const sumZ = validTerms.reduce((acc, t) => acc + (t.z || 0), 0)
+    const centerX = sumX / validTerms.length
+    const centerY = sumY / validTerms.length
+    const centerZ = sumZ / validTerms.length
+
+    const distances = validTerms.map((t) =>
+      Math.sqrt(
+        Math.pow((t.x || 0) - centerX, 2) +
+        Math.pow((t.y || 0) - centerY, 2) +
+        Math.pow((t.z || 0) - centerZ, 2)
+      )
+    )
+    const maxDist = distances.length > 0 ? Math.max(...distances) : 3
+    const zoomDistance = Math.max(maxDist * 1.5, 3)
+
+    const hash = subcategory.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    const offsetX = (hash % 10) * 0.3 - 1.5
+    const offsetY = ((hash * 7) % 10) * 0.3 - 1.5
+
+    set({
+      filters: { ...state.filters, searchQuery: displayName },
       selection: { ...state.selection, selectedCluster: null, selectedTerm: null },
       view: {
         ...state.view,

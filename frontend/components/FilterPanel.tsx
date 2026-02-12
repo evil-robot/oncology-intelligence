@@ -13,6 +13,7 @@ export default function FilterPanel() {
   const resetFilters = useStore((s) => s.resetFilters)
   const selectAndFocusTerm = useStore((s) => s.selectAndFocusTerm)
   const focusOnCategory = useStore((s) => s.focusOnCategory)
+  const focusOnSubcategory = useStore((s) => s.focusOnSubcategory)
   const [taxonomy, setTaxonomy] = useState<TaxonomyCategory[]>([])
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
 
@@ -209,7 +210,7 @@ export default function FilterPanel() {
                   cat.subcategories.map((sub) => (
                     <button
                       key={sub.name}
-                      onClick={() => setFilter('searchQuery', sub.name.replace(/_/g, ' '))}
+                      onClick={() => focusOnSubcategory(sub.name)}
                       className="w-full text-left px-3 py-1 text-xs text-gray-400 hover:text-white hover:bg-surface/50 rounded transition-colors"
                     >
                       {sub.name.replace(/_/g, ' ')} ({sub.count})

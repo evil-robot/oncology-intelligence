@@ -373,7 +373,7 @@ The heart of VIOLET. An interactive Three.js scene rendering 750+ search terms a
 
 - Real-time fuzzy search across all terms
 - Expandable category accordion (25 categories with color coding)
-- Click subcategory → fills search box with subcategory name, filtering visible terms
+- Click subcategory → fills search box with subcategory name AND zooms camera to those terms in 3D space (via `focusOnSubcategory` store action)
 - Geography dropdown (50 US states)
 - Click category → camera animates to category centroid
 
