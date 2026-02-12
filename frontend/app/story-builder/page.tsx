@@ -21,7 +21,7 @@ interface StoryDraft {
   assigned_to: string
   dependency: string
   sprint: string
-  demo_critical: string
+  demo_critical: boolean
   acceptance_criteria: string
   notes: string
 }
@@ -35,7 +35,7 @@ const EMPTY_DRAFT: StoryDraft = {
   assigned_to: '',
   dependency: 'None',
   sprint: '',
-  demo_critical: 'No',
+  demo_critical: false,
   acceptance_criteria: '',
   notes: '',
 }
@@ -204,7 +204,7 @@ export default function StoryBuilderPage() {
     setSubmitStatus('submitting')
     setErrorMsg('')
     try {
-      const res = await fetch(`${API_URL}/api/stories/submit`, {
+      const res = await fetch(`${API_URL}/api/stories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
@@ -250,11 +250,14 @@ export default function StoryBuilderPage() {
               <span className="text-white/90 font-semibold text-sm">Story Builder</span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-[11px] text-gray-500 uppercase tracking-wider">
               <AIPulse />
               <span>AI-Assisted</span>
             </div>
+            <a href="/story-builder/board" className="text-xs text-violet-400 hover:text-white transition-colors border border-violet-500/20 rounded-md px-3 py-1.5 hover:border-violet-500/40">
+              Board
+            </a>
             <a href="/" className="text-xs text-gray-500 hover:text-white transition-colors border border-white/10 rounded-md px-3 py-1.5 hover:border-white/20">
               Dashboard
             </a>
@@ -402,8 +405,20 @@ export default function StoryBuilderPage() {
                     options={context?.assignees || []} placeholder="Who's building this?" />
                 </div>
 
-                <Field label="Demo Critical?" value={draft.demo_critical} onChange={(v) => setDraft(d => ({ ...d, demo_critical: v }))}
-                  options={['Yes', 'No']} />
+                <div>
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-[0.2em] mb-2 font-medium">Demo Critical?</label>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(d => ({ ...d, demo_critical: !d.demo_critical }))}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                      draft.demo_critical
+                        ? 'bg-pink-500/10 text-pink-400 border-pink-500/30'
+                        : 'bg-white/[0.03] text-gray-500 border-white/10'
+                    }`}
+                  >
+                    {draft.demo_critical ? 'Yes' : 'No'}
+                  </button>
+                </div>
 
                 <button
                   onClick={() => callAssist('story', JSON.stringify(draft))}
@@ -482,18 +497,21 @@ export default function StoryBuilderPage() {
                       </svg>
                     </div>
                     <div>
-                      <h2 className="text-2xl font-semibold text-white mb-2">Shipped to Sprint Backlog</h2>
+                      <h2 className="text-2xl font-semibold text-white mb-2">Saved to Backlog</h2>
                       <p className="text-gray-400">
-                        <span className="text-white font-medium">{draft.feature}</span> has been added to{' '}
-                        <span className="text-violet-400 font-medium">{draft.sprint}</span>
+                        <span className="text-white font-medium">{draft.feature}</span> has been added to the backlog
+                        {draft.sprint && <> for <span className="text-violet-400 font-medium">{draft.sprint}</span></>}
                       </p>
                     </div>
                     <div className="flex gap-3 justify-center pt-4">
                       <button onClick={resetForm} className="px-6 py-3 bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 rounded-xl font-medium text-sm shadow-lg shadow-violet-600/20 transition-all">
                         Create Another
                       </button>
+                      <a href="/story-builder/board" className="px-6 py-3 bg-white/[0.04] border border-violet-500/20 hover:border-violet-500/40 rounded-xl text-sm text-violet-400 transition-all inline-flex items-center">
+                        View on Board
+                      </a>
                       <a href="/" className="px-6 py-3 bg-white/[0.04] border border-white/10 hover:border-white/20 rounded-xl text-sm transition-all inline-flex items-center">
-                        Back to Dashboard
+                        Dashboard
                       </a>
                     </div>
                   </div>
@@ -503,7 +521,7 @@ export default function StoryBuilderPage() {
                       <h2 className="text-2xl font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
                         Review & Ship
                       </h2>
-                      <p className="text-gray-500 text-sm mt-2">Verify everything before pushing to the sprint sheet.</p>
+                      <p className="text-gray-500 text-sm mt-2">Verify everything before saving to the backlog.</p>
                     </div>
 
                     {/* Story Card Preview */}
@@ -519,7 +537,7 @@ export default function StoryBuilderPage() {
                             {draft.sprint}
                           </span>
                         )}
-                        {draft.demo_critical === 'Yes' && (
+                        {draft.demo_critical && (
                           <span className="px-3 py-1 rounded-lg bg-pink-500/10 text-pink-400 text-xs font-bold border border-pink-500/20">
                             Demo Critical
                           </span>
@@ -567,10 +585,10 @@ export default function StoryBuilderPage() {
                         {submitStatus === 'submitting' ? (
                           <>
                             <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                            Pushing to Sheet...
+                            Saving...
                           </>
                         ) : (
-                          'Ship to Sprint Backlog'
+                          'Save to Backlog'
                         )}
                       </button>
                     </div>

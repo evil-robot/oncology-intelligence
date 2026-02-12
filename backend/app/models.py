@@ -315,6 +315,56 @@ class DataSource(Base):
     )
 
 
+class Sprint(Base):
+    """Sprints for product development planning."""
+
+    __tablename__ = "sprints"
+
+    id = Column(Integer, primary_key=True)
+    sprint_id = Column(String(20), unique=True, nullable=False, index=True)  # "2026-S1"
+    theme = Column(String(300))
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
+    demo_target = Column(String(300))
+    release_version = Column(String(50))
+    status = Column(String(20), default="planning")  # planning, active, completed, cancelled
+    owner = Column(String(100))
+    risks = Column(Text)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    stories = relationship("Story", back_populates="sprint")
+
+
+class Story(Base):
+    """User stories for sprint planning and the Kanban board."""
+
+    __tablename__ = "stories"
+
+    id = Column(Integer, primary_key=True)
+    epic = Column(String(300), index=True)
+    feature = Column(String(300))
+    user_story = Column(Text)
+    priority = Column(String(20))  # Critical, High, Medium, Low
+    story_points = Column(Integer)  # Fibonacci: 1,2,3,5,8,13
+    status = Column(String(30), default="backlog", index=True)  # backlog, ready, in_progress, review, done, archived
+    assigned_to = Column(String(100), index=True)
+    dependency = Column(String(500))
+    sprint_id = Column(Integer, ForeignKey("sprints.id"), nullable=True)
+    demo_critical = Column(Boolean, default=False)
+    acceptance_criteria = Column(Text)
+    notes = Column(Text)
+    sort_order = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    sprint = relationship("Sprint", back_populates="stories")
+
+
 class PipelineRun(Base):
     """Track pipeline execution for monitoring and debugging."""
 

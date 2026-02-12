@@ -7,8 +7,8 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 0.9.7-alpha |
-| Last Updated | February 11, 2026 |
+| Version | 0.10.0-alpha |
+| Last Updated | February 12, 2026 |
 | Repository | oncology-intelligence |
 | Deployment | Railway.app (frontend + backend), Neon (database) |
 | Live URL | https://violet.supertruth.ai |
@@ -24,6 +24,7 @@
 | 0.9.5 | Feb 11, 2026 | Category-aware embedding context for better cross-domain cluster separation |
 | 0.9.6 | Feb 11, 2026 | QA pass: fix HTTPException returns, null dereferences, pipeline rollback, taxonomy dedup, frontend crash bugs |
 | 0.9.7 | Feb 11, 2026 | QA phase 2: CORS restriction, chat rate limiting, WebGL memory fix, cascade deletes, pipeline transaction safety, responsive layout, stale copy cleanup |
+| 0.10.0 | Feb 12, 2026 | Story Builder: replaced Google Sheets with DB-backed CRUD, added Kanban board page, Sprint/Story models, status lifecycle, import script |
 
 ---
 
@@ -33,7 +34,7 @@ VIOLET is SuperTruth Inc.'s oncology and rare disease intelligence platform. It 
 
 The platform serves two audiences:
 - **Researchers and clinicians** who need to see the landscape of oncology search behavior across 750+ curated terms, 25 disease categories, and 50 US states
-- **Product and operations teams** who use the integrated Story Builder and Google Sheets sprint management to plan, track, and ship features
+- **Product and operations teams** who use the integrated Story Builder and Kanban board to plan, track, and ship features
 
 VIOLET answers three questions simultaneously: **What** exists in the search field (structural intelligence), **When** people search (anxiety intelligence — 2am search spikes), and **How** they phrase it when they're scared (narrative intelligence — People Also Ask phrasing). These three layers combined produce **behavioral signal intelligence**.
 
@@ -110,7 +111,7 @@ VIOLET ingests ~750 curated oncology search terms, generates semantic embeddings
 | AI Chat | Conversational interface with full database context injection |
 | Anomaly Detection | Automatic spike, drop, emerging term, and regional outlier flagging |
 | Auto Taxonomy Expansion | Pipeline auto-discovers and promotes breakout search terms |
-| Story Builder | LLM-guided user story wizard with Google Sheets sprint sync |
+| Story Builder | LLM-guided user story wizard + database-backed Kanban board |
 | Demo Mode | Full synthetic data generation for demos without API keys |
 
 ### 3.4 Explicit Non-Goals
@@ -137,7 +138,7 @@ VIOLET intentionally does **not**:
 | AI Chat | Live | GPT-4o-mini with database context |
 | Anomaly Detection | Live | Spike/drop/emerging/regional detection |
 | Auto Taxonomy Expansion | Live | Breakout term promotion, capped at 50/run |
-| Story Builder | Live | LLM wizard + Google Sheets sync |
+| Story Builder | Live | LLM wizard + DB-backed Kanban board (replaced Sheets) |
 | Cluster Explainability | Planned (S1) | Proximity index, scale index, narrative generator |
 | Pipeline Scheduler | Planned | Automated daily/weekly runs |
 | Export/Reporting | Planned | PDF/CSV export of insights |
@@ -164,7 +165,8 @@ FastAPI Backend (Railway)
    │
    ├──▶ PostgreSQL + pgvector (Neon)
    │     SearchTerm, Cluster, TrendData, GeographicRegion,
-   │     RelatedQuery, HourlyPattern, QuestionSurface, Post
+   │     RelatedQuery, HourlyPattern, QuestionSurface, Post,
+   │     Sprint, Story
    │
    ├──▶ OpenAI API
    │     Embeddings (text-embedding-3-small)
@@ -174,10 +176,6 @@ FastAPI Backend (Railway)
    ├──▶ SerpAPI
    │     Google Trends, PAA, Autocomplete,
    │     Scholar, News, Patents
-   │
-   ├──▶ Google Sheets API
-   │     Sprint Dashboard, Sprint Backlog,
-   │     Taxonomy Governance, Release Tracker
    │
    └──▶ External APIs (on-demand, not stored)
          ClinicalTrials.gov, PubMed, FDA openFDA
@@ -194,7 +192,7 @@ FastAPI Backend (Railway)
 | Business Logic | Python route handlers | Data aggregation, anomaly detection, LLM orchestration |
 | Pipeline | Python orchestrator | 8-step ETL: taxonomy → embed → cluster → trends → discover → questions → hourly → SDOH |
 | Storage | PostgreSQL + pgvector (Neon) | Relational data + vector similarity search |
-| External | SerpAPI, OpenAI, Google Sheets, ClinicalTrials, PubMed, FDA | Data sources and integrations |
+| External | SerpAPI, OpenAI, ClinicalTrials, PubMed, FDA | Data sources and integrations |
 
 ### 4.3 Directory Structure
 
@@ -217,7 +215,7 @@ oncology-intelligence/
 │   │       ├── triangulation.py  # External evidence APIs
 │   │       ├── pipeline.py       # Pipeline management
 │   │       ├── chat.py           # Conversational AI
-│   │       └── stories.py        # Story Builder (Google Sheets + LLM)
+│   │       └── stories.py        # Story Builder (DB-backed CRUD + Kanban board + LLM)
 │   ├── pipeline/
 │   │   ├── orchestrator.py       # 8-step pipeline coordinator
 │   │   ├── taxonomy.py           # 749+ seed terms, 20 categories
@@ -239,7 +237,8 @@ oncology-intelligence/
 │   │   ├── page.tsx              # Main 3-column dashboard
 │   │   ├── globals.css           # Tailwind + glass morphism + animations
 │   │   ├── login/page.tsx        # Password auth page
-│   │   ├── story-builder/page.tsx # LLM-guided story creation wizard
+│   │   ├── story-builder/page.tsx       # LLM-guided story creation wizard
+│   │   ├── story-builder/board/page.tsx # Kanban board (5-column status view)
 │   │   └── api/auth/route.ts     # Cookie-based auth endpoint
 │   ├── components/
 │   │   ├── ClusterVisualization.tsx   # 3D engine (~850 lines)
@@ -340,14 +339,9 @@ The backend API restricts CORS to configured origins (configurable via `CORS_ORI
 - Chat rate limiting prevents abuse
 - Future: API key auth for programmatic access
 
-### 6.4 Google Sheets Integration Auth
+### 6.4 Sprint Data Storage
 
-The Story Builder authenticates to Google Sheets via a GCP service account:
-- Project: `violet-sheets-mcp`
-- Service account: `violet-mcp@violet-sheets-mcp.iam.gserviceaccount.com`
-- APIs enabled: Google Sheets API, Google Drive API
-- Credentials: Base64-encoded JSON key stored as `GOOGLE_SERVICE_ACCOUNT_JSON_B64` env var on Railway
-- Fallback: File path `~/.config/google/violet-mcp-key.json` for local development
+Sprint and story data is stored in PostgreSQL (same Neon database as all other VIOLET data). The `sprints` and `stories` tables are auto-created by `Base.metadata.create_all()` on startup. Historical data was migrated from Google Sheets via `scripts/import_sheets.py`.
 
 ---
 
@@ -459,7 +453,7 @@ Conversation history (last 10 messages). Suggested follow-up questions based on 
 
 ### 7.11 Story Builder (`/story-builder`)
 
-LLM-guided user story creation wizard for sprint planning. Designed for Dustin (and any team member) to create well-structured stories without touching the spreadsheet.
+LLM-guided user story creation wizard for sprint planning. Designed for Dustin (and any team member) to create well-structured stories without touching a spreadsheet.
 
 **Design:** Dark theme with animated particle network (60 canvas particles with proximity connections), gradient orbs, glass-morphism cards, SuperTruth logo + VIOLET badge, pulsing AI indicator.
 
@@ -468,23 +462,43 @@ LLM-guided user story creation wizard for sprint planning. Designed for Dustin (
 | Step | Name | What Happens |
 |------|------|-------------|
 | 01 | Ideate | Describe idea in plain language → AI extracts epic, feature, user story |
-| 02 | Shape | Refine story, set priority/points/sprint/assignee (dropdowns from sheet) |
+| 02 | Shape | Refine story, set priority/points/sprint/assignee (dropdowns from DB) |
 | 03 | Define | AI generates acceptance criteria, set dependencies and notes |
-| 04 | Ship | Review card preview → submit pushes to Sprint Backlog in Google Sheet |
+| 04 | Ship | Review card preview → saves to backlog in database |
 
-**Google Sheets Integration:**
-- Sheet: `Violet_Product_Management_Workbook_Populated_v0.1.1`
-- Tabs: Sprint Dashboard, Sprint Backlog, Taxonomy Governance, Data Integrations, Release Tracker, Change Log, Demo Risk Register, KPI Tracking, Governance Rules
-- Auth: GCP service account with Editor access
+**Database Integration:**
+- Stories and sprints stored in PostgreSQL (`stories` and `sprints` tables)
 - `GET /api/stories/context` — reads existing epics/sprints/features/assignees for dropdowns
 - `POST /api/stories/assist` — LLM-powered story assistance (4 step types)
-- `POST /api/stories/submit` — appends completed story row to Sprint Backlog
+- `POST /api/stories` — creates story in database with status "backlog"
 
-### 7.12 Pipeline Management (PipelinePanel.tsx)
+### 7.12 Story Board (`/story-builder/board`)
+
+Kanban board showing all stories organized by status column.
+
+**Design:** Same dark theme as Story Builder. Full-width 5-column grid, sticky header with sprint selector and progress bar.
+
+**Components:**
+- **BoardHeader** — Sprint selector dropdown, "New Story" button, sprint progress bar (done points / total points)
+- **BoardFilters** — Priority, assignee, epic filters + text search
+- **BoardColumn** — One per status, color-coded header, scrollable story cards
+- **StoryCard** — Compact card: priority dot, feature name, points badge, assignee initial
+- **StoryDetailDrawer** — Right-side slide panel on card click. Full editable fields, status transition buttons, archive
+
+**Column Colors:**
+- Backlog: gray | Ready: blue | In Progress: violet | Review: amber | Done: emerald
+
+**Story Lifecycle:**
+```
+backlog → ready → in_progress → review → done → archived
+```
+Board shows 5 columns (archived hidden). Status transitions enforced by API.
+
+### 7.13 Pipeline Management (PipelinePanel.tsx)
 
 Stats grid (terms, trend points, regions, related queries, discovered terms, questions). Run button triggers the 8-step pipeline with animated progress indicator.
 
-### 7.13 Demo Mode
+### 7.14 Demo Mode
 
 When no real pipeline data exists, VIOLET generates realistic synthetic data for every endpoint:
 - Trend time-series: 90-day data with seeded pseudorandom for reproducibility
@@ -604,6 +618,41 @@ Demo mode is flagged in responses (`demo_mode: true`) so the UI shows appropriat
 | x, y, z | float | 3D coordinates near relevant cluster |
 | cluster_id | int (FK) | Associated cluster |
 
+### 8.3 Sprint Planning Tables
+
+**Sprint** — Development sprint containers.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Auto-increment |
+| sprint_id | varchar(20) | Unique human-readable: "2026-S1" |
+| theme | varchar(300) | Sprint theme |
+| start_date / end_date | datetime | Sprint window |
+| demo_target | varchar(300) | Demo target description |
+| release_version | varchar(50) | e.g. "v0.2.0" |
+| status | varchar(20) | planning, active, completed, cancelled |
+| owner | varchar(100) | Sprint owner |
+| risks | text | Risk notes |
+
+**Story** — User stories for the Kanban board.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Auto-increment |
+| epic | varchar(300) | Epic name (indexed) |
+| feature | varchar(300) | Feature name |
+| user_story | text | "As a... I want... So that..." |
+| priority | varchar(20) | Critical, High, Medium, Low |
+| story_points | int | Fibonacci: 1, 2, 3, 5, 8, 13 |
+| status | varchar(30) | backlog, ready, in_progress, review, done, archived (indexed) |
+| assigned_to | varchar(100) | Assignee name (indexed) |
+| dependency | varchar(500) | Dependency notes |
+| sprint_id | int (FK → sprints.id) | Sprint assignment (nullable) |
+| demo_critical | bool | Whether story is demo-critical |
+| acceptance_criteria | text | Numbered criteria |
+| notes | text | Implementation notes |
+| sort_order | int | Board ordering within column |
+
 ---
 
 ## 9. Data Pipeline
@@ -718,9 +767,18 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/context` | Existing epics, sprints, features, assignees from Google Sheet |
+| GET | `/` | List/filter stories (?sprint_id, ?status, ?priority, ?assigned_to, ?search) |
+| POST | `/` | Create story (saves to backlog) |
+| GET | `/{id}` | Get single story |
+| PATCH | `/{id}` | Update story fields |
+| PATCH | `/{id}/status` | Move story status (with transition validation) |
+| DELETE | `/{id}` | Archive a story (soft delete) |
+| GET | `/board` | Stories grouped by status column for Kanban board |
+| GET | `/context` | Existing epics, sprints, features, assignees from DB |
 | POST | `/assist` | LLM story writing assistance (steps: idea, story, criteria, refine) |
-| POST | `/submit` | Push completed story to Sprint Backlog in Google Sheet |
+| GET | `/sprints` | List all sprints |
+| POST | `/sprints` | Create sprint |
+| PATCH | `/sprints/{id}` | Update sprint |
 
 ### 10.11 Pipeline Endpoints (`/api/pipeline`)
 
@@ -809,8 +867,8 @@ All secrets stored as environment variables on Railway. Never committed to git. 
 | SERPAPI_KEY | Google Trends and related engines | Yes |
 | BASIC_AUTH_PASSWORD | Frontend login password | Yes (prod) |
 | NEXT_PUBLIC_API_URL | Backend URL for frontend | Yes |
-| GOOGLE_SERVICE_ACCOUNT_JSON_B64 | Base64 GCP service account key | Yes (prod) |
-| GOOGLE_SHEET_ID | Sprint management spreadsheet ID | No (has default) |
+| GOOGLE_SERVICE_ACCOUNT_JSON_B64 | Base64 GCP service account key (import script only) | No |
+| GOOGLE_SHEET_ID | Sprint management spreadsheet ID (import script only) | No |
 | ENVIRONMENT | "development" or "production" | No |
 | LOG_LEVEL | Default "INFO" | No |
 | AZURE_STORAGE_CONNECTION_STRING | Cloud blob storage | No |
@@ -862,7 +920,9 @@ PostgreSQL with pgvector extension on Neon serverless. IVFFlat index on embeddin
 - Center (flex-1): Three.js 3D Canvas with control bar
 - Right sidebar (w-96): DetailPanel, VulnerabilityPanel tabs
 
-**Story Builder:** Single-column centered (max-w-3xl), 4-step wizard with particle background
+**Story Builder Wizard:** Single-column centered (max-w-3xl), 4-step wizard with particle background
+
+**Story Board:** Full-width 5-column Kanban grid (max-w-[1600px]), sticky header, right-slide detail drawer
 
 **Login:** Centered card with SuperTruth branding and legal disclaimer
 
@@ -892,9 +952,9 @@ pediatric_oncology → blue-500, adult_oncology → indigo-500, rare_genetic →
 
 9. **Auto-seed on startup** — `database.py` seeds all taxonomy terms with deterministic 3D coordinates on startup. Deploying with new terms makes them appear automatically.
 
-10. **Google Sheets as sprint source of truth** — Sprint data lives in Google Sheets (not a database) because it's where stakeholders already work. Story Builder writes directly to the sheet.
+10. **Database as sprint source of truth** — Sprint and story data lives in PostgreSQL alongside all other VIOLET data. Stories follow a lifecycle: backlog → ready → in_progress → review → done → archived. The Kanban board provides a visual management interface. Historical data was migrated from Google Sheets.
 
-11. **Base64 credentials for cloud** — GCP service account key stored as base64 env var on Railway, with file path fallback for local dev. No credential files in production.
+11. **Base64 credentials for cloud** — OpenAI and SerpAPI keys stored as env vars on Railway. No credential files in production.
 
 ---
 
