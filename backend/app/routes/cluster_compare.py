@@ -93,11 +93,12 @@ def _cosine_similarity_np(a: list[float], b: list[float]) -> float:
     return float(np.dot(va, vb) / denom)
 
 
-def _proximity_index(db: Session, cluster_a: Cluster, cluster_b: Cluster) -> int:
+def _proximity_index(db: Session, cluster_a: Cluster, cluster_b: Cluster) -> tuple[int, bool]:
     """Cosine similarity of centroid_embedding vectors, 0-100.
 
     Uses pgvector `<=>` operator when both embeddings exist; falls back to
-    numpy if either is null.
+    numpy if either is null.  Returns (score, is_estimated) where is_estimated
+    is True when no embeddings were available and the score is a placeholder.
     """
     if cluster_a.centroid_embedding is not None and cluster_b.centroid_embedding is not None:
         try:
@@ -110,7 +111,7 @@ def _proximity_index(db: Session, cluster_a: Cluster, cluster_b: Cluster) -> int
                 {"a": cluster_a.id, "b": cluster_b.id},
             ).fetchone()
             if row and row[0] is not None:
-                return max(0, min(100, round(row[0] * 100)))
+                return max(0, min(100, round(row[0] * 100))), False
         except Exception as exc:
             logger.warning("pgvector cosine failed, falling back to numpy: %s", exc)
 
@@ -118,8 +119,8 @@ def _proximity_index(db: Session, cluster_a: Cluster, cluster_b: Cluster) -> int
     ea = list(cluster_a.centroid_embedding) if cluster_a.centroid_embedding is not None else None
     eb = list(cluster_b.centroid_embedding) if cluster_b.centroid_embedding is not None else None
     if ea and eb:
-        return max(0, min(100, round(_cosine_similarity_np(ea, eb) * 100)))
-    return 50  # neutral when no embeddings
+        return max(0, min(100, round(_cosine_similarity_np(ea, eb) * 100))), False
+    return 50, True  # estimated — no embeddings available
 
 
 def _spatial_proximity(cluster_a: Cluster, cluster_b: Cluster) -> tuple[int, float]:
@@ -149,11 +150,12 @@ def _generate_explanation(
     summary_a: ClusterSummary,
     summary_b: ClusterSummary,
     metrics: CompareMetrics,
+    proximity_estimated: bool = False,
 ) -> tuple[str, bool]:
     """Call GPT-4o-mini for a narrative explanation. Returns (text, is_fallback)."""
 
     if not settings.openai_api_key:
-        return _fallback_explanation(summary_a, summary_b, metrics), True
+        return _fallback_explanation(summary_a, summary_b, metrics, proximity_estimated), True
 
     try:
         from openai import OpenAI
@@ -163,7 +165,9 @@ def _generate_explanation(
             "You are an oncology research assistant for VIOLET. You explain relationships "
             "between disease-topic clusters in a 3D semantic space built from 750+ oncology "
             "search term embeddings (UMAP + HDBSCAN). Write 3-4 short paragraphs: "
-            "(1) Are they close or far? Use the proximity index. "
+            "(1) Are they close or far? Use the spatial proximity and proximity index to "
+            "judge closeness. If proximity index is marked as estimated, rely on spatial "
+            "proximity instead. "
             "(2) WHY — reference specific shared terms/categories. "
             "(3) Scale differences — which cluster has more search footprint? "
             "(4) Shared subcategories or overlaps. "
@@ -180,12 +184,19 @@ def _generate_explanation(
             f"top categories: {', '.join(summary_b.top_categories) or 'none'}, "
             f"top terms: {', '.join(summary_b.top_terms) or 'none'}, "
             f"avg search volume: {summary_b.avg_search_volume if summary_b.avg_search_volume is not None else 'unknown'}\n\n"
-            f"Proximity index: {metrics.proximity_index}/100\n"
+            f"Proximity index: {metrics.proximity_index}/100"
+            f"{' (estimated — no embedding vectors available)' if proximity_estimated else ''}\n"
             f"Spatial proximity: {metrics.spatial_proximity}/100\n"
             f"3D distance: {metrics.euclidean_distance_3d}\n"
             f"Shared categories: {', '.join(metrics.shared_categories) or 'none'}\n"
             f"Shared subcategories: {', '.join(metrics.shared_subcategories) or 'none'}"
         )
+
+        if proximity_estimated:
+            user_prompt += (
+                "\n\nNote: Proximity index is estimated (no embedding vectors available "
+                "for these clusters). Use spatial proximity as the primary indicator of closeness."
+            )
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -198,32 +209,40 @@ def _generate_explanation(
         )
         content = response.choices[0].message.content
         if not content:
-            return _fallback_explanation(summary_a, summary_b, metrics), True
+            return _fallback_explanation(summary_a, summary_b, metrics, proximity_estimated), True
         return content, False
 
     except Exception as exc:
         logger.warning("OpenAI call failed, using fallback: %s", exc)
-        return _fallback_explanation(summary_a, summary_b, metrics), True
+        return _fallback_explanation(summary_a, summary_b, metrics, proximity_estimated), True
 
 
 def _fallback_explanation(
     summary_a: ClusterSummary,
     summary_b: ClusterSummary,
     metrics: CompareMetrics,
+    proximity_estimated: bool = False,
 ) -> str:
     """Template-based explanation when LLM is unavailable."""
-    pi = metrics.proximity_index
-    if pi >= 70:
-        relation = "highly similar"
-    elif pi >= 40:
-        relation = "moderately related"
+    # When proximity index is estimated (no embeddings), use spatial proximity instead
+    score = metrics.spatial_proximity if proximity_estimated else metrics.proximity_index
+    if score >= 70:
+        relation = "closely positioned" if proximity_estimated else "highly similar"
+    elif score >= 40:
+        relation = "moderately close" if proximity_estimated else "moderately related"
     else:
-        relation = "semantically distinct"
+        relation = "spatially distant" if proximity_estimated else "semantically distinct"
 
-    parts = [
-        f'"{summary_a.name}" and "{summary_b.name}" are {relation} '
-        f"with a proximity index of {pi}/100."
-    ]
+    if proximity_estimated:
+        parts = [
+            f'"{summary_a.name}" and "{summary_b.name}" are {relation} '
+            f"based on their spatial proximity ({metrics.spatial_proximity}/100)."
+        ]
+    else:
+        parts = [
+            f'"{summary_a.name}" and "{summary_b.name}" are {relation} '
+            f"with a proximity index of {metrics.proximity_index}/100."
+        ]
 
     if metrics.shared_categories:
         parts.append(
@@ -271,7 +290,7 @@ def compare_clusters(req: CompareRequest, db: Session = Depends(get_db)):
     terms_b = db.query(SearchTerm).filter(SearchTerm.cluster_id == req.cluster_b_id).all()
 
     # Compute metrics
-    prox_idx = _proximity_index(db, cluster_a, cluster_b)
+    prox_idx, prox_estimated = _proximity_index(db, cluster_a, cluster_b)
     spatial_score, euclidean_dist = _spatial_proximity(cluster_a, cluster_b)
     shared_cats, shared_subs = _category_overlap(terms_a, terms_b)
 
@@ -286,7 +305,7 @@ def compare_clusters(req: CompareRequest, db: Session = Depends(get_db)):
         shared_subcategories=shared_subs,
     )
 
-    explanation, is_fallback = _generate_explanation(summary_a, summary_b, metrics)
+    explanation, is_fallback = _generate_explanation(summary_a, summary_b, metrics, prox_estimated)
 
     return CompareResponse(
         cluster_a=summary_a,

@@ -209,6 +209,7 @@ export default function FilterPanel() {
                   cat.subcategories.map((sub) => (
                     <button
                       key={sub.name}
+                      onClick={() => setFilter('searchQuery', sub.name.replace(/_/g, ' '))}
                       className="w-full text-left px-3 py-1 text-xs text-gray-400 hover:text-white hover:bg-surface/50 rounded transition-colors"
                     >
                       {sub.name.replace(/_/g, ' ')} ({sub.count})

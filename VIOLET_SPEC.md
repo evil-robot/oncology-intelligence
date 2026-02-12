@@ -373,6 +373,7 @@ The heart of VIOLET. An interactive Three.js scene rendering 750+ search terms a
 
 - Real-time fuzzy search across all terms
 - Expandable category accordion (25 categories with color coding)
+- Click subcategory → fills search box with subcategory name, filtering visible terms
 - Geography dropdown (50 US states)
 - Click category → camera animates to category centroid
 
@@ -399,7 +400,7 @@ Automatic pattern detection across the dataset:
 | Seasonal Anomaly | Out-of-season interest patterns |
 | Correlation | Co-moving term pairs |
 
-Severity levels: high, medium, low. Clickable cards fly camera to the relevant term.
+Severity levels: high, medium, low. Clickable cards fly camera to the relevant term. Each card shows a `Crosshair` icon (lucide-react) to signal "navigate to" rather than "expand."
 
 ### 7.5 SDOH Vulnerability Analysis (VulnerabilityInsightsPanel.tsx)
 
@@ -511,7 +512,7 @@ Fixed-position overlay that auto-appears when both comparison clusters (A and B)
 - **Auto-trigger:** Watches `useComparison()` — popup shows when both `clusterA` and `clusterB` are non-null.
 - **Auto-dismiss:** Clears when comparison is cleared (ESC / click empty / "Show All").
 - **Session cache:** `useRef<Map>` keyed by `"${aId}-${bId}"` — re-selecting the same pair shows cached result instantly.
-- **Layout:** `position: fixed`, centered, `z-index: 50`, 480px wide, glass morphism background (`rgba(5,5,20,0.92)` + `backdrop-filter: blur(16px)`), cyan/pink badges matching SelectionRing colors.
+- **Layout:** `position: fixed`, centered, `z-[1000]` (above 3D `Html` labels at z-index 200-300), 480px wide, glass morphism background (`rgba(5,5,20,0.92)` + `backdrop-filter: blur(16px)`), cyan/pink badges matching SelectionRing colors.
 - **Content:** Header with A↔B cluster names, proximity index gauge (red→yellow→green), term count scale, shared category pills (purple), AI explanation body.
 
 ### 7.15 Demo Mode
@@ -806,11 +807,11 @@ The pipeline is an 8-step sequential ETL process coordinated by `PipelineOrchest
 
 **Response:** `cluster_a` & `cluster_b` summaries (id, name, term_count, avg_search_volume, top_categories, top_terms), `metrics` (proximity_index 0-100, spatial_proximity 0-100, euclidean_distance_3d, shared_categories, shared_subcategories), `explanation` (AI narrative or template fallback), `fallback` (bool).
 
-**Proximity Index** (0-100): cosine similarity of `centroid_embedding` vectors via pgvector `<=>`. Falls back to numpy when embeddings are null.
+**Proximity Index** (0-100): cosine similarity of `centroid_embedding` vectors via pgvector `<=>`. Falls back to numpy when embeddings are null. Returns `(score, is_estimated)` — when no embeddings exist, `is_estimated=True` and the LLM prompt instructs the model to rely on spatial proximity instead.
 
 **Spatial Proximity** (0-100): Euclidean distance of centroid_x/y/z normalized against ~24.2-unit bounding cube diagonal.
 
-**LLM:** gpt-4o-mini, temp 0.6, max_tokens 400. Fallback template when OpenAI is unavailable.
+**LLM:** gpt-4o-mini, temp 0.6, max_tokens 400. When proximity index is estimated, the system prompt tells the LLM to use spatial proximity as primary closeness indicator. Fallback template also uses spatial proximity when estimated.
 
 ### 10.12 Pipeline Endpoints (`/api/pipeline`)
 

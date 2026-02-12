@@ -9,7 +9,7 @@ import {
   Link2,
   AlertTriangle,
   Sparkles,
-  ChevronRight,
+  Crosshair,
   RefreshCw
 } from 'lucide-react'
 import { useStore } from '@/lib/store'
@@ -70,7 +70,7 @@ function InsightCard({ insight, onClick }: { insight: Insight; onClick: () => vo
             </div>
           )}
         </div>
-        <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
+        <Crosshair className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
       </div>
     </button>
   )

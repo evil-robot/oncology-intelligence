@@ -77,7 +77,7 @@ export default function ClusterComparisonPopup() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+      className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none"
       role="dialog"
       aria-label="Cluster comparison"
     >
