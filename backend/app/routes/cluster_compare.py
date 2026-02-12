@@ -175,11 +175,11 @@ def _generate_explanation(
             f"Cluster A: \"{summary_a.name}\" — {summary_a.term_count} terms, "
             f"top categories: {', '.join(summary_a.top_categories) or 'none'}, "
             f"top terms: {', '.join(summary_a.top_terms) or 'none'}, "
-            f"avg search volume: {summary_a.avg_search_volume or 'unknown'}\n\n"
+            f"avg search volume: {summary_a.avg_search_volume if summary_a.avg_search_volume is not None else 'unknown'}\n\n"
             f"Cluster B: \"{summary_b.name}\" — {summary_b.term_count} terms, "
             f"top categories: {', '.join(summary_b.top_categories) or 'none'}, "
             f"top terms: {', '.join(summary_b.top_terms) or 'none'}, "
-            f"avg search volume: {summary_b.avg_search_volume or 'unknown'}\n\n"
+            f"avg search volume: {summary_b.avg_search_volume if summary_b.avg_search_volume is not None else 'unknown'}\n\n"
             f"Proximity index: {metrics.proximity_index}/100\n"
             f"Spatial proximity: {metrics.spatial_proximity}/100\n"
             f"3D distance: {metrics.euclidean_distance_3d}\n"
@@ -196,7 +196,10 @@ def _generate_explanation(
             temperature=0.6,
             max_tokens=400,
         )
-        return response.choices[0].message.content, False
+        content = response.choices[0].message.content
+        if not content:
+            return _fallback_explanation(summary_a, summary_b, metrics), True
+        return content, False
 
     except Exception as exc:
         logger.warning("OpenAI call failed, using fallback: %s", exc)
@@ -249,7 +252,7 @@ def _fallback_explanation(
 # ---------------------------------------------------------------------------
 
 @router.post("/compare", response_model=CompareResponse)
-async def compare_clusters(req: CompareRequest, db: Session = Depends(get_db)):
+def compare_clusters(req: CompareRequest, db: Session = Depends(get_db)):
     """Compare two clusters — returns metrics and an AI-generated explanation."""
 
     if req.cluster_a_id == req.cluster_b_id:
