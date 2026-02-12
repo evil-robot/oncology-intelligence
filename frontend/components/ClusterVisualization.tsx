@@ -825,6 +825,9 @@ export default function ClusterVisualization() {
   const [autoPilot, setAutoPilot] = useState(false)
   const resetView = useStore((s) => s.resetView)
   const clearComparison = useStore((s) => s.clearComparison)
+  const comparisonReady = useStore((s) =>
+    s.comparison.clusterA !== null && s.comparison.clusterB !== null
+  )
   const hasActiveFilter = useStore((s) =>
     s.filters.clusterId !== null ||
     s.filters.category !== null ||
@@ -858,7 +861,7 @@ export default function ClusterVisualization() {
       <Canvas
         camera={{ position: [0, 5, 18], fov: 55 }}
         gl={{ antialias: true, alpha: false }}
-        onPointerMissed={() => clearComparison()}
+        onPointerMissed={() => { if (comparisonReady) clearComparison() }}
       >
         <color attach="background" args={[COLORS.background]} />
 

@@ -137,17 +137,30 @@ export const useStore = create<AppState>((set, get) => ({
   comparison: initialComparison,
   setComparisonCluster: (cluster) =>
     set((state) => {
-      const { clusterA } = state.comparison
+      const { clusterA, clusterB } = state.comparison
+      // Shared: select cluster for DetailPanel + camera focus
+      const selectionAndView = {
+        selection: { ...state.selection, selectedCluster: cluster, selectedTerm: null },
+        view: {
+          ...state.view,
+          cameraTarget: [cluster.x || 0, cluster.y || 0, cluster.z || 0] as [number, number, number],
+          cameraPosition: [cluster.x || 0, cluster.y || 0, (cluster.z || 0) + 5] as [number, number, number],
+        },
+      }
       // Click A again → clear comparison
       if (clusterA?.id === cluster.id) {
-        return { comparison: initialComparison }
+        return { comparison: initialComparison, ...selectionAndView }
+      }
+      // Click B again → deselect B, keep A
+      if (clusterB?.id === cluster.id) {
+        return { comparison: { ...state.comparison, clusterB: null }, ...selectionAndView }
       }
       // No A yet → set A
       if (!clusterA) {
-        return { comparison: { clusterA: cluster, clusterB: null } }
+        return { comparison: { clusterA: cluster, clusterB: null }, ...selectionAndView }
       }
       // A exists, clicking different → set/replace B
-      return { comparison: { ...state.comparison, clusterB: cluster } }
+      return { comparison: { ...state.comparison, clusterB: cluster }, ...selectionAndView }
     }),
   clearComparison: () => set({ comparison: initialComparison }),
 
