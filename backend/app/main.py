@@ -90,13 +90,6 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database initialized")
 
-    # Diagnostic: log which Google Sheets credential source is available
-    import os
-    gs_b64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_B64", "")
-    gs_path = os.path.expanduser("~/.config/google/violet-mcp-key.json")
-    logger.info("Google Sheets auth: B64 env var set=%s (len=%d), file exists=%s",
-                bool(gs_b64), len(gs_b64), os.path.exists(gs_path))
-
     yield
     # Shutdown
     logger.info("Shutting down...")
