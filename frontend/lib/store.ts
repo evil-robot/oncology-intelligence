@@ -19,6 +19,11 @@ interface SelectionState {
   hoveredTerm: Term | null
 }
 
+interface ComparisonState {
+  clusterA: Cluster | null
+  clusterB: Cluster | null
+}
+
 interface ViewState {
   cameraPosition: [number, number, number]
   cameraTarget: [number, number, number]
@@ -46,6 +51,11 @@ interface AppState {
   selectCluster: (cluster: Cluster | null) => void
   selectTerm: (term: Term | null) => void
   setHoveredTerm: (term: Term | null) => void
+
+  // Comparison pair
+  comparison: ComparisonState
+  setComparisonCluster: (cluster: Cluster) => void
+  clearComparison: () => void
 
   // View
   view: ViewState
@@ -76,6 +86,11 @@ const initialSelection: SelectionState = {
   selectedCluster: null,
   selectedTerm: null,
   hoveredTerm: null,
+}
+
+const initialComparison: ComparisonState = {
+  clusterA: null,
+  clusterB: null,
 }
 
 const initialView: ViewState = {
@@ -117,6 +132,24 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({
       selection: { ...state.selection, hoveredTerm: term },
     })),
+
+  // Comparison pair
+  comparison: initialComparison,
+  setComparisonCluster: (cluster) =>
+    set((state) => {
+      const { clusterA } = state.comparison
+      // Click A again → clear comparison
+      if (clusterA?.id === cluster.id) {
+        return { comparison: initialComparison }
+      }
+      // No A yet → set A
+      if (!clusterA) {
+        return { comparison: { clusterA: cluster, clusterB: null } }
+      }
+      // A exists, clicking different → set/replace B
+      return { comparison: { ...state.comparison, clusterB: cluster } }
+    }),
+  clearComparison: () => set({ comparison: initialComparison }),
 
   // View
   view: initialView,
@@ -235,6 +268,7 @@ export const useStore = create<AppState>((set, get) => ({
   resetView: () =>
     set((state) => ({
       selection: initialSelection,
+      comparison: initialComparison,
       filters: { ...initialFilters, geoCode: state.filters.geoCode },
       view: { ...state.view, cameraPosition: initialView.cameraPosition, cameraTarget: initialView.cameraTarget },
     })),
@@ -248,6 +282,7 @@ export const useStore = create<AppState>((set, get) => ({
 // Selectors
 export const useFilters = () => useStore((state) => state.filters)
 export const useSelection = () => useStore((state) => state.selection)
+export const useComparison = () => useStore((state) => state.comparison)
 export const useView = () => useStore((state) => state.view)
 export const useClusters = () => useStore((state) => state.clusters)
 export const useTerms = () => useStore((state) => state.terms)

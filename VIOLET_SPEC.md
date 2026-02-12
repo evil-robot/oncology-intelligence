@@ -360,8 +360,12 @@ The heart of VIOLET. An interactive Three.js scene rendering 750+ search terms a
 - **FlyControls** — WASD first-person navigation
 - **AutoPilot** — Cinematic Catmull-Rom spline camera tour
 - **CameraController** — Smooth lerp to store-controlled position on selection
+- **SelectionRing** — Pulsing ring overlay for comparison-selected clusters (cyan=A, pink=B)
+- **ComparisonConnection** — Dashed line with glow connecting cluster pair A↔B
 
-**Interaction:** Click cluster → isolate cluster terms → camera flies to centroid. Click term → detail panel opens. ESC/Show All → reset to full galaxy view `[0,0,15]`.
+**Interaction:** Click cluster A → highlighted with pulsing ring + "A" badge. Click cluster B → both highlighted, dashed line connects them. Click third cluster → replaces B, keeps A. Click A again → clears comparison. ESC or click empty space → clears comparison. Click term → detail panel opens. Show All → reset to full galaxy view `[0,0,15]`.
+
+**Comparison pair state** in Zustand (`store.ts`): `comparison: { clusterA: Cluster | null, clusterB: Cluster | null }`. Actions: `setComparisonCluster(cluster)`, `clearComparison()`. Selector: `useComparison()`.
 
 ### 7.2 Filter & Search (FilterPanel.tsx)
 

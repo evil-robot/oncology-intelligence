@@ -4,7 +4,7 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react'
 import { Canvas, useFrame, useThree, extend } from '@react-three/fiber'
 import { OrbitControls, Html, Line, Stars, PointMaterial, Points, PointerLockControls, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
-import { useStore, useSelection, useView } from '@/lib/store'
+import { useStore, useSelection, useView, useComparison } from '@/lib/store'
 import type { Cluster, Term, Post } from '@/lib/api'
 
 // Float mode state (global for simplicity)
@@ -204,17 +204,73 @@ function DataPoint({ term, isSelected, isHovered, onClick, onHover, colorValue, 
   )
 }
 
+// Pulsing selection ring for comparison mode
+function SelectionRing({ color, size }: { color: string; size: number }) {
+  const ringRef = useRef<THREE.Mesh>(null)
+
+  useFrame(({ clock }) => {
+    if (ringRef.current) {
+      const pulse = 1 + Math.sin(clock.getElapsedTime() * 3) * 0.15
+      ringRef.current.scale.setScalar(pulse)
+    }
+  })
+
+  return (
+    <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[size * 2.2, size * 2.6, 64]} />
+      <meshBasicMaterial color={color} transparent opacity={0.5} side={THREE.DoubleSide} />
+    </mesh>
+  )
+}
+
+// Dashed line connecting comparison pair
+function ComparisonConnection({ clusterA, clusterB }: { clusterA: Cluster; clusterB: Cluster }) {
+  const points: [number, number, number][] = useMemo(() => [
+    [clusterA.x, clusterA.y, clusterA.z],
+    [clusterB.x, clusterB.y, clusterB.z],
+  ], [clusterA, clusterB])
+
+  return (
+    <group>
+      {/* Glow line */}
+      <Line
+        points={points}
+        color={COLORS.primary}
+        lineWidth={4}
+        transparent
+        opacity={0.15}
+      />
+      {/* Core dashed line */}
+      <Line
+        points={points}
+        color={COLORS.primary}
+        lineWidth={2}
+        dashed
+        dashScale={8}
+        dashSize={0.4}
+        gapSize={0.2}
+        transparent
+        opacity={0.7}
+      />
+    </group>
+  )
+}
+
 // Cluster marker - glowing orb (decorative, doesn't block clicks)
-function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
+function ClusterOrb({ cluster, isSelected, isHovered, isComparisonA, isComparisonB, onClick, onHover }: {
   cluster: Cluster
   isSelected: boolean
   isHovered: boolean
+  isComparisonA: boolean
+  isComparisonB: boolean
   onClick: () => void
   onHover: (hovered: boolean) => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const innerRef = useRef<THREE.Mesh>(null)
   const _scaleVec = useRef(new THREE.Vector3())
+
+  const isActive = isSelected || isComparisonA || isComparisonB
 
   const clusterColor = useMemo(() => {
     return cluster.color || COLORS.secondary
@@ -229,7 +285,7 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
       groupRef.current.rotation.y = clock.getElapsedTime() * 0.1
     }
     if (innerRef.current) {
-      const scale = isSelected ? 1.4 : isHovered ? 1.2 : 1
+      const scale = isActive ? 1.4 : isHovered ? 1.2 : 1
       innerRef.current.scale.lerp(_scaleVec.current.set(scale, scale, scale), 0.1)
     }
   })
@@ -242,13 +298,21 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
 
   return (
     <group position={[cluster.x, cluster.y, cluster.z]} ref={groupRef}>
+      {/* Comparison selection ring */}
+      {(isComparisonA || isComparisonB) && (
+        <SelectionRing
+          color={isComparisonA ? COLORS.primary : COLORS.secondary}
+          size={orbSize}
+        />
+      )}
+
       {/* Outer glow rings - decorative only, no raycast */}
       <mesh rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
         <ringGeometry args={[orbSize * 1.5, orbSize * 1.8, 32]} />
         <meshBasicMaterial
           color={clusterColor}
           transparent
-          opacity={isSelected ? 0.4 : isHovered ? 0.3 : 0.15}
+          opacity={isActive ? 0.4 : isHovered ? 0.3 : 0.15}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -259,8 +323,8 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
         <meshBasicMaterial
           color={clusterColor}
           transparent
-          opacity={isSelected ? 0.9 : isHovered ? 0.7 : 0.5}
-          wireframe={!isSelected && !isHovered}
+          opacity={isActive ? 0.9 : isHovered ? 0.7 : 0.5}
+          wireframe={!isActive && !isHovered}
         />
       </mesh>
 
@@ -275,13 +339,32 @@ function ClusterOrb({ cluster, isSelected, isHovered, onClick, onHover }: {
       </mesh>
 
       {/* Label */}
-      {(isHovered || isSelected) && (
+      {(isHovered || isActive) && (
         <Html center position={[0, orbSize + 0.5, 0]} zIndexRange={[200, 300]}>
           <div style={clusterLabelStyle}>
-            <div style={{ color: COLORS.secondary, fontWeight: 600, marginBottom: '4px' }}>
-              {displayName}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {(isComparisonA || isComparisonB) && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: isComparisonA ? COLORS.primary : COLORS.secondary,
+                  color: '#000',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}>
+                  {isComparisonA ? 'A' : 'B'}
+                </span>
+              )}
+              <span style={{ color: COLORS.secondary, fontWeight: 600 }}>
+                {displayName}
+              </span>
             </div>
-            <div style={{ fontSize: '10px', color: '#aaa' }}>
+            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '4px' }}>
               {cluster.termCount} terms
             </div>
           </div>
@@ -633,9 +716,10 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
   const allTerms = useStore((s) => s.terms)
   const filters = useStore((s) => s.filters)
   const selection = useSelection()
+  const comparison = useComparison()
   const view = useView()
   const selectAndFocusTerm = useStore((s) => s.selectAndFocusTerm)
-  const selectAndFocusCluster = useStore((s) => s.selectAndFocusCluster)
+  const setComparisonCluster = useStore((s) => s.setComparisonCluster)
   const setHoveredTerm = useStore((s) => s.setHoveredTerm)
   const [hoveredClusterId, setHoveredClusterId] = useState<number | null>(null)
 
@@ -702,7 +786,9 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
           cluster={cluster}
           isSelected={selection.selectedCluster?.id === cluster.id}
           isHovered={hoveredClusterId === cluster.id}
-          onClick={() => selectAndFocusCluster(cluster)}
+          isComparisonA={comparison.clusterA?.id === cluster.id}
+          isComparisonB={comparison.clusterB?.id === cluster.id}
+          onClick={() => setComparisonCluster(cluster)}
           onHover={(h) => setHoveredClusterId(h ? cluster.id : null)}
         />
       ))}
@@ -724,6 +810,11 @@ function Scene({ floatMode, autoPilot }: { floatMode: boolean; autoPilot: boolea
 
       {/* Connections */}
       {view.showConnections && <DataConnections terms={terms} clusters={filteredClusters} />}
+
+      {/* Comparison pair connection */}
+      {comparison.clusterA && comparison.clusterB && (
+        <ComparisonConnection clusterA={comparison.clusterA} clusterB={comparison.clusterB} />
+      )}
     </>
   )
 }
@@ -733,7 +824,24 @@ export default function ClusterVisualization() {
   const [floatMode, setFloatMode] = useState(false)
   const [autoPilot, setAutoPilot] = useState(false)
   const resetView = useStore((s) => s.resetView)
-  const hasActiveFilter = useStore((s) => s.filters.clusterId !== null || s.filters.category !== null || s.selection.selectedCluster !== null)
+  const clearComparison = useStore((s) => s.clearComparison)
+  const hasActiveFilter = useStore((s) =>
+    s.filters.clusterId !== null ||
+    s.filters.category !== null ||
+    s.selection.selectedCluster !== null ||
+    s.comparison.clusterA !== null
+  )
+
+  // ESC key clears comparison selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !floatMode && !autoPilot) {
+        clearComparison()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [floatMode, autoPilot, clearComparison])
 
   const toggleFloatMode = () => {
     setFloatMode(!floatMode)
@@ -750,6 +858,7 @@ export default function ClusterVisualization() {
       <Canvas
         camera={{ position: [0, 5, 18], fov: 55 }}
         gl={{ antialias: true, alpha: false }}
+        onPointerMissed={() => clearComparison()}
       >
         <color attach="background" args={[COLORS.background]} />
 
