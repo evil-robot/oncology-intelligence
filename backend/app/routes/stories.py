@@ -10,7 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from openai import OpenAI
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from ..config import get_settings
@@ -134,7 +134,7 @@ async def list_stories(
     db: Session = Depends(get_db),
 ):
     """List stories with optional filters."""
-    q = db.query(Story).filter(Story.status != "archived")
+    q = db.query(Story).options(joinedload(Story.sprint)).filter(Story.status != "archived")
 
     if sprint_id is not None:
         q = q.filter(Story.sprint_id == sprint_id)
@@ -202,7 +202,7 @@ async def get_board(
     db: Session = Depends(get_db),
 ):
     """Get stories grouped by status column for the Kanban board."""
-    q = db.query(Story).filter(Story.status.in_(BOARD_STATUSES))
+    q = db.query(Story).options(joinedload(Story.sprint)).filter(Story.status.in_(BOARD_STATUSES))
 
     if sprint_id is not None:
         q = q.filter(Story.sprint_id == sprint_id)

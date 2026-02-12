@@ -99,6 +99,7 @@ export default function BoardPage() {
   const [filterAssignee, setFilterAssignee] = useState('')
   const [filterEpic, setFilterEpic] = useState('')
   const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   // Detail drawer
   const [selectedStory, setSelectedStory] = useState<StoryCard | null>(null)
@@ -117,7 +118,7 @@ export default function BoardPage() {
       if (filterPriority) params.set('priority', filterPriority)
       if (filterAssignee) params.set('assigned_to', filterAssignee)
       if (filterEpic) params.set('epic', filterEpic)
-      if (searchText) params.set('search', searchText)
+      if (debouncedSearch) params.set('search', debouncedSearch)
 
       const res = await fetch(`${API_URL}/api/stories/board?${params}`)
       if (!res.ok) throw new Error(`Board API error ${res.status}`)
@@ -129,7 +130,7 @@ export default function BoardPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedSprint, filterPriority, filterAssignee, filterEpic, searchText])
+  }, [selectedSprint, filterPriority, filterAssignee, filterEpic, debouncedSearch])
 
   const fetchSprints = async () => {
     try {
@@ -139,6 +140,12 @@ export default function BoardPage() {
       setSprints(data)
     } catch { /* ignore */ }
   }
+
+  // Debounce search text
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchText), 300)
+    return () => clearTimeout(t)
+  }, [searchText])
 
   useEffect(() => { fetchSprints() }, [])
   useEffect(() => { fetchBoard() }, [fetchBoard])
@@ -155,14 +162,10 @@ export default function BoardPage() {
         throw new Error(err.detail || `Status update failed (${res.status})`)
       }
       await fetchBoard()
-      // Update drawer if open
+      // Refresh drawer if open for this story
       if (selectedStory?.id === storyId) {
-        const updated = await res.json().catch(() => null)
-        if (updated) setSelectedStory(updated)
-        else {
-          const fresh = await fetch(`${API_URL}/api/stories/${storyId}`).then(r => r.json())
-          setSelectedStory(fresh)
-        }
+        const fresh = await fetch(`${API_URL}/api/stories/${storyId}`)
+        if (fresh.ok) setSelectedStory(await fresh.json())
       }
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to move story')
