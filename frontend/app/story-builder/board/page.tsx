@@ -157,8 +157,12 @@ export default function BoardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
+      if (res.redirected) throw new Error('API URL misconfigured — check NEXT_PUBLIC_API_URL')
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
+        const contentType = res.headers.get('content-type') || ''
+        const err = contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {}
         throw new Error(err.detail || `Status update failed (${res.status})`)
       }
       await fetchBoard()
@@ -181,6 +185,7 @@ export default function BoardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
+      if (res.redirected) throw new Error('API URL misconfigured — check NEXT_PUBLIC_API_URL')
       if (!res.ok) throw new Error('Save failed')
       const updated = await res.json()
       setSelectedStory(updated)
@@ -195,11 +200,14 @@ export default function BoardPage() {
   const archiveStory = async () => {
     if (!selectedStory || !confirm('Archive this story?')) return
     try {
-      await fetch(`${API_URL}/api/stories/${selectedStory.id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_URL}/api/stories/${selectedStory.id}`, { method: 'DELETE' })
+      if (res.redirected || !res.ok) throw new Error('Archive failed')
       setDrawerOpen(false)
       setSelectedStory(null)
       await fetchBoard()
-    } catch { /* ignore */ }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to archive story')
+    }
   }
 
   const openDrawer = async (story: StoryCard) => {

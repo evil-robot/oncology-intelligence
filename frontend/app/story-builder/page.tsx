@@ -176,7 +176,7 @@ export default function StoryBuilderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step: stepKey, input_text: inputText, context: draft }),
       })
-      if (!res.ok) {
+      if (res.redirected || !res.ok) {
         setAiSuggestion(`AI assistant error (${res.status}). You can still fill in the fields manually.`)
         return
       }
@@ -203,21 +203,32 @@ export default function StoryBuilderPage() {
   const handleSubmit = async () => {
     setSubmitStatus('submitting')
     setErrorMsg('')
+    const url = `${API_URL}/api/stories`
     try {
-      const res = await fetch(`${API_URL}/api/stories`, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       })
+      if (res.redirected) {
+        throw new Error('API URL is misconfigured — story requests are not reaching the backend. Check NEXT_PUBLIC_API_URL in your deployment settings.')
+      }
       if (!res.ok) {
-        const errBody = await res.json().catch(() => null)
-        const detail = errBody?.detail || `Server error (${res.status})`
+        const contentType = res.headers.get('content-type') || ''
+        const errBody = contentType.includes('application/json')
+          ? await res.json().catch(() => null)
+          : null
+        const detail = errBody?.detail || errBody?.error || `Server error (${res.status})`
         throw new Error(detail)
       }
       setSubmitStatus('done')
     } catch (e) {
       setSubmitStatus('error')
-      setErrorMsg(e instanceof Error ? e.message : 'Submit failed')
+      const msg = e instanceof Error ? e.message : 'Submit failed'
+      console.error('[StoryBuilder] POST failed:', url, msg)
+      setErrorMsg(url.includes('localhost')
+        ? 'Cannot reach backend — NEXT_PUBLIC_API_URL is not configured for this deployment.'
+        : msg)
     }
   }
 
